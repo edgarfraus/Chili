@@ -76,21 +76,21 @@ final class ViewerLauncher {
 
     // The whole GTK/GStreamer runtime lives inside the helper bundle: GTK's
     // quartz backend resolves its data relative to the running bundle's Resources.
-    private var viewerApp: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/SPICE Viewer.app") }
+    private var viewerApp: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/Chili Viewer.app") }
     private var viewerExecutable: URL { viewerApp.appendingPathComponent("Contents/MacOS/remote-viewer") }
     private var resources: URL { viewerApp.appendingPathComponent("Contents/Resources") }
     private var plugins: URL { viewerApp.appendingPathComponent("Contents/PlugIns") }
 
     lazy var cacheDir: URL = {
         let base = fm.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        let dir = base.appendingPathComponent(Bundle.main.bundleIdentifier ?? "SpiceClient", isDirectory: true)
+        let dir = base.appendingPathComponent(Bundle.main.bundleIdentifier ?? "Chili", isDirectory: true)
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }()
 
     lazy var logDir: URL = {
         let base = fm.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-        let dir = base.appendingPathComponent("Logs/SPICE Client", isDirectory: true)
+        let dir = base.appendingPathComponent("Logs/Chili", isDirectory: true)
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }()

@@ -7,7 +7,7 @@
   </defs>
   <rect width="660" height="420" fill="url(#g)"/>
   <text x="330" y="58" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
-        font-size="22" font-weight="600" fill="#1C2550">SPICE Client</text>
+        font-size="22" font-weight="600" fill="#1C2550">Chili</text>
   <text x="330" y="84" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
         font-size="13" fill="#5A6382">Drag the app into Applications · Trascina l'app in Applicazioni</text>
   <!-- arrow between the two icons (icons sit at x=170 and x=490, y=205) -->

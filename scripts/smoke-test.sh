@@ -5,8 +5,8 @@
 source "$(dirname "$0")/env.sh"
 source "$(dirname "$0")/lib.sh"
 
-APP="$DIST_DIR/$ARCH/SPICE Client.app"
-VC="$APP/Contents/Helpers/SPICE Viewer.app/Contents"
+APP="$DIST_DIR/$ARCH/Chili.app"
+VC="$APP/Contents/Helpers/Chili Viewer.app/Contents"
 [[ -d "$APP" ]] || die "app not found: run scripts/bundle-app.sh first"
 
 hidden="$PREFIX.hidden"

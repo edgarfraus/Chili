@@ -10,11 +10,11 @@
 		<string>it</string>
 	</array>
 	<key>CFBundleDisplayName</key>
-	<string>SPICE Client</string>
+	<string>Chili</string>
 	<key>CFBundleName</key>
-	<string>SPICE Client</string>
+	<string>Chili</string>
 	<key>CFBundleExecutable</key>
-	<string>SPICE Client</string>
+	<string>Chili</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>

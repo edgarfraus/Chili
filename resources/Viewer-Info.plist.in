@@ -5,9 +5,9 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleName</key>
-	<string>SPICE Viewer</string>
+	<string>Chili Viewer</string>
 	<key>CFBundleDisplayName</key>
-	<string>SPICE Viewer</string>
+	<string>Chili Viewer</string>
 	<key>CFBundleExecutable</key>
 	<string>remote-viewer</string>
 	<key>CFBundleIconFile</key>

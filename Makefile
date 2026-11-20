@@ -1,7 +1,7 @@
-# SPICE Client for macOS — see README.md
-#   make            build everything and produce dist/SPICE-Client-<version>-<arch>.dmg
+# Chili, an unofficial SPICE client for macOS — see README.md
+#   make            build everything and produce dist/Chili-<version>-<arch>.dmg
 #   make stack      build only the libraries + remote-viewer (slow, cached)
-#   make app        assemble dist/<arch>/SPICE Client.app
+#   make app        assemble dist/<arch>/Chili.app
 #   make run        assemble and open the app
 #   make test       smoke-test the assembled app
 #   make clean      remove the app/DMG (keeps the compiled stack)
@@ -27,7 +27,7 @@ dmg: test
 	scripts/make-dmg.sh
 
 run: app
-	open "dist/$(ARCH)/SPICE Client.app"
+	open "dist/$(ARCH)/Chili.app"
 
 icon:
 	scripts/make-icon.sh

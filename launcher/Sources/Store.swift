@@ -57,7 +57,7 @@ final class ProfileStore: ObservableObject {
 }
 
 enum Keychain {
-    private static let service = (Bundle.main.bundleIdentifier ?? "SpiceClient") + ".servers"
+    private static let service = (Bundle.main.bundleIdentifier ?? "Chili") + ".servers"
 
     static func save(_ secret: String, account: String) {
         delete(account: account)

@@ -1,8 +1,9 @@
 <p align="center">
-  <img src="resources/icon/AppIcon.svg" width="128" alt="SPICE Client icon">
+  <img src="resources/icon/AppIcon.svg" width="128" alt="Chili icon">
 </p>
 
-<h1 align="center">SPICE Client (unofficial) for macOS</h1>
+<h1 align="center">Chili</h1>
+<p align="center"><b>An unofficial SPICE client for macOS</b></p>
 
 <p align="center">
   A native, self-contained SPICE remote viewer for macOS — with one-click Proxmox VE integration.
@@ -11,8 +12,8 @@
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/edgarfraus/Spice-Client-unofficial-for-macos?label=download"></a>
-  <a href="../../actions/workflows/build.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/edgarfraus/Spice-Client-unofficial-for-macos/build.yml?branch=main"></a>
+  <a href="../../releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/edgarfraus/chili-spice-macos?label=download"></a>
+  <a href="../../actions/workflows/build.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/edgarfraus/chili-spice-macos/build.yml?branch=main"></a>
   <img alt="macOS 12+" src="https://img.shields.io/badge/macOS-12%2B-blue">
   <a href="LICENSE"><img alt="License: GPL-2.0-or-later" src="https://img.shields.io/badge/license-GPL--2.0--or--later-green"></a>
 </p>
@@ -20,7 +21,7 @@
 ---
 
 Connecting to a virtual machine's SPICE console from a Mac has always meant Homebrew taps, XQuartz or
-compiling GTK yourself. **SPICE Client** is a regular drag-to-install app: it bundles the upstream
+compiling GTK yourself. **Chili** is a regular drag-to-install app: it bundles the upstream
 `remote-viewer` (virt-viewer + spice-gtk) with everything it needs, and adds a small native front end
 that talks to Proxmox VE for you.
 
@@ -59,14 +60,14 @@ that talks to Proxmox VE for you.
 
    | Your Mac | Download |
    |---|---|
-   | Apple Silicon (M1, M2, M3, M4…) | `SPICE-Client-<version>-arm64.dmg` |
-   | Intel | `SPICE-Client-<version>-x86_64.dmg` |
+   | Apple Silicon (M1, M2, M3, M4…) | `Chili-<version>-arm64.dmg` |
+   | Intel | `Chili-<version>-x86_64.dmg` |
 
    Not sure? Apple menu  → **About This Mac**: *Chip: Apple M…* means Apple Silicon,
    *Processor: Intel…* means Intel.
 
-2. Open the DMG and drag **SPICE Client** onto the **Applications** folder.
-3. Eject the DMG and start SPICE Client from Launchpad or Applications.
+2. Open the DMG and drag **Chili** onto the **Applications** folder.
+3. Eject the DMG and start Chili from Launchpad or Applications.
 
 Requirements: macOS 12 Monterey or later.
 
@@ -78,17 +79,17 @@ or that the app "could not be opened". This is expected:
 
 1. Click **Done** (or **OK**) in the dialog.
 2. Open  → **System Settings → Privacy & Security**.
-3. Scroll down to *Security*: you will see *"SPICE Client" was blocked…*. Click **Open Anyway** and
+3. Scroll down to *Security*: you will see *"Chili" was blocked…*. Click **Open Anyway** and
    confirm with your password or Touch ID.
 
 You only do this once. If you prefer the Terminal:
 
 ```sh
-xattr -dr com.apple.quarantine "/Applications/SPICE Client.app"
+xattr -dr com.apple.quarantine "/Applications/Chili.app"
 ```
 
 You can always check that the DMG you downloaded is the one built by GitHub Actions: each release
-lists the SHA-256 of every DMG (`shasum -a 256 SPICE-Client-*.dmg`).
+lists the SHA-256 of every DMG (`shasum -a 256 Chili-*.dmg`).
 
 ## Using it with Proxmox VE
 
@@ -107,7 +108,7 @@ In the Proxmox web UI, select the VM:
 
 ### 2. Add your server
 
-1. Start SPICE Client and click **Add Server…** in the sidebar (or **File → New Proxmox Server…**, ⌘N).
+1. Start Chili and click **Add Server…** in the sidebar (or **File → New Proxmox Server…**, ⌘N).
 2. Fill in:
    - **Host**: the address you use for the web UI, without `https://` and without `:8006`.
    - **Port**: `8006`, unless you changed it.
@@ -143,7 +144,7 @@ what the viewer needs.
    `spice`, and keep *Privilege Separation* checked. Copy the secret: it is shown only once.
 2. **Datacenter → Permissions → Add → API Token Permission**: path `/vms`, token `user@realm!spice`,
    role `PVEVMUser` (it includes `VM.Console`, `VM.Audit` and `VM.PowerMgmt`).
-3. In SPICE Client, edit the server, choose **Log in with → API token**, enter
+3. In Chili, edit the server, choose **Log in with → API token**, enter
    `user@realm!spice` as **Token ID** and paste the **Secret**.
 
 ### Network requirements
@@ -162,11 +163,11 @@ exposing them.
 ### Opening consoles from the Proxmox web UI
 
 You can keep using the browser: **Console → SPICE** (the small arrow next to *Console*) downloads a
-`.vv` file. Open it and SPICE Client starts the viewer directly. The file contains a one-time ticket
+`.vv` file. Open it and Chili starts the viewer directly. The file contains a one-time ticket
 valid for about 30 seconds, and the viewer deletes it after reading.
 
 - **Chrome / Edge:** click the arrow next to the download → **Always open files of this type**.
-- **Firefox:** when asked, choose *Open with SPICE Client* and tick *Do this automatically*.
+- **Firefox:** when asked, choose *Open with Chili* and tick *Do this automatically*.
 - **Safari:** open the file from the downloads list (Safari never auto-opens this kind of file).
 
 ## Quick Connect (QEMU, libvirt, others)
@@ -190,7 +191,7 @@ qemu-system-x86_64 ... -vga qxl -spice port=5900,addr=0.0.0.0,password-secret=se
 <video><model type='qxl'/></video>
 ```
 
-Links of the form `spice://host:5900` also open in SPICE Client, and **File → Open Connection File…**
+Links of the form `spice://host:5900` also open in Chili, and **File → Open Connection File…**
 (⌘O) opens any `.vv` file.
 
 ## Inside the viewer
@@ -203,12 +204,12 @@ Links of the form `spice://host:5900` also open in SPICE Client, and **File → 
 | Change resolution | resize the window (needs the SPICE agent in the guest) |
 | Copy and paste between Mac and VM | just copy and paste (needs the SPICE agent) |
 
-The **⌘ Command** key is sent to the VM as the *Super / Windows* key. In **SPICE Client → Settings**
+The **⌘ Command** key is sent to the VM as the *Super / Windows* key. In **Chili → Settings**
 you can choose to always open the viewer in full screen and turn on verbose logging.
 
 ## Troubleshooting
 
-Viewer logs are in `~/Library/Logs/SPICE Client/remote-viewer.log` (**Help → Show Viewer Logs**). For
+Viewer logs are in `~/Library/Logs/Chili/remote-viewer.log` (**Help → Show Viewer Logs**). For
 details, turn on **Settings → Verbose viewer logging** and reproduce the problem.
 
 | Problem | Solution |
@@ -247,9 +248,9 @@ Requirements:
   `build/` and doesn't touch your system.
 
 ```sh
-git clone https://github.com/edgarfraus/Spice-Client-unofficial-for-macos.git
-cd Spice-Client-unofficial-for-macos
-make            # → dist/SPICE-Client-<version>-<arch>.dmg
+git clone https://github.com/edgarfraus/chili-spice-macos.git
+cd chili-spice-macos
+make            # → dist/Chili-<version>-<arch>.dmg
 ```
 
 The first build takes 30–90 minutes depending on the Mac; later builds reuse what is already compiled.
@@ -258,7 +259,7 @@ Other targets:
 | Command | What it does |
 |---|---|
 | `make stack` | build only the libraries and `remote-viewer` |
-| `make app` | assemble `dist/<arch>/SPICE Client.app` |
+| `make app` | assemble `dist/<arch>/Chili.app` |
 | `make run` | assemble and open the app |
 | `make test` | check that the bundle is self-contained and its plugins load |
 | `make clean` / `make distclean` | remove `dist/` / remove everything, downloads included |
@@ -284,10 +285,10 @@ To sign and notarize releases, add these repository secrets: `MACOS_CERTIFICATE`
 ## How it works
 
 ```
-SPICE Client.app
-├── Contents/MacOS/SPICE Client         ← Swift/SwiftUI launcher: Proxmox API, Quick Connect,
+Chili.app
+├── Contents/MacOS/Chili         ← Swift/SwiftUI launcher: Proxmox API, Quick Connect,
 │                                         .vv and spice:// handling, Keychain
-└── Contents/Helpers/SPICE Viewer.app   ← upstream remote-viewer (virt-viewer)
+└── Contents/Helpers/Chili Viewer.app   ← upstream remote-viewer (virt-viewer)
     ├── MacOS/remote-viewer               spice-gtk · GTK 3 (Quartz) · GStreamer
     ├── Frameworks/                       every library, relocated to @rpath
     ├── PlugIns/                          GStreamer and gdk-pixbuf modules
@@ -308,7 +309,7 @@ environment that points GTK, GStreamer and gdk-pixbuf at the bundle.
 
 ## License and credits
 
-SPICE Client is free software under the [GNU General Public License v2.0 or later](LICENSE).
+Chili is free software under the [GNU General Public License v2.0 or later](LICENSE).
 
 It bundles, unmodified or with the small patches in [`patches/`](patches), the work of these projects
 (licenses in brackets): [virt-viewer](https://gitlab.com/virt-viewer/virt-viewer) (GPL-2.0+),
@@ -317,7 +318,7 @@ It bundles, unmodified or with the small patches in [`patches/`](patches), the w
 [GStreamer](https://gstreamer.freedesktop.org) (LGPL-2.1+), cairo and pixman (LGPL-2.1 / MPL-1.1, MIT),
 HarfBuzz, FreeType, Fontconfig, FriBidi, libepoxy, libffi, PCRE2, libpng, libjpeg-turbo, expat, Opus,
 LZ4, OpenSSL (Apache-2.0), GNU gettext (LGPL-2.1+) and the Adwaita icon theme (CC-BY-SA-3.0 / LGPL-3.0).
-Each release includes `SPICE-Client-<version>-sources.tar` with the exact sources of all of them.
+Each release includes `Chili-<version>-sources.tar` with the exact sources of all of them.
 
 This project is not affiliated with Red Hat, the SPICE project or Proxmox Server Solutions GmbH.
 SPICE is a trademark of Red Hat, Inc.; Proxmox is a trademark of Proxmox Server Solutions GmbH.

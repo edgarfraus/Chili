@@ -84,7 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 560),
                                   styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                                   backing: .buffered, defer: false)
-            window.title = "SPICE Client"
+            window.title = "Chili"
             window.contentView = NSHostingView(rootView: ContentView().environmentObject(model).environmentObject(model.profiles))
             window.setFrameAutosaveName("MainWindow")
             window.isReleasedWhenClosed = false
@@ -149,7 +149,7 @@ enum AppInfo {
 enum MainMenu {
     static func build(target: AppDelegate) -> NSMenu {
         let main = NSMenu()
-        let name = "SPICE Client"
+        let name = "Chili"
         func L(_ s: String) -> String { NSLocalizedString(s, comment: "") }
         func item(_ title: String, _ action: Selector?, _ key: String = "", _ mods: NSEvent.ModifierFlags = .command,
                   _ t: AnyObject? = nil) -> NSMenuItem {
@@ -194,7 +194,7 @@ enum MainMenu {
         NSApp.windowsMenu = window
 
         let help = NSMenu(title: L("Help"))
-        help.addItem(item(L("SPICE Client Guide"), #selector(AppDelegate.openGuide(_:)), "?", .command, target))
+        help.addItem(item(L("Chili Guide"), #selector(AppDelegate.openGuide(_:)), "?", .command, target))
         help.addItem(item(L("Show Viewer Logs"), #selector(AppDelegate.openLogs(_:)), "", .command, target))
         NSApp.helpMenu = help
 

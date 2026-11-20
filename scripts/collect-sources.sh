@@ -5,7 +5,7 @@ source "$(dirname "$0")/env.sh"
 source "$(dirname "$0")/lib.sh"
 
 VERSION="$(cat "$REPO_ROOT/VERSION")"
-name="SPICE-Client-$VERSION-sources"
+name="Chili-$VERSION-sources"
 stage="$BUILD_ROOT/$name"
 rm -rf "$stage" && mkdir -p "$stage/upstream"
 cp "$SOURCES_DIR"/*.tar.* "$SOURCES_DIR"/*.tgz "$stage/upstream/" 2>/dev/null || true
@@ -13,7 +13,7 @@ cp "$SOURCES_DIR"/*.tar.* "$SOURCES_DIR"/*.tgz "$stage/upstream/" 2>/dev/null ||
 commit="$(sed -n 's/^VIRT_VIEWER_COMMIT=//p' "$REPO_ROOT/scripts/build-stack.sh")"
 git -C "$WORK_DIR/virt-viewer" archive --format=tar.gz --prefix="virt-viewer-$commit/" HEAD \
     > "$stage/upstream/virt-viewer-$commit.tar.gz"
-git -C "$REPO_ROOT" archive --format=tar --prefix="spice-client-macos/" HEAD | tar -x -C "$stage"
+git -C "$REPO_ROOT" archive --format=tar --prefix="chili-spice-macos/" HEAD | tar -x -C "$stage"
 tar -cf "$DIST_DIR/$name.tar" -C "$BUILD_ROOT" "$name"
 rm -rf "$stage"
 msg "Done: $DIST_DIR/$name.tar"

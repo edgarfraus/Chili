@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Assembles "SPICE Client.app" from the built stack (scripts/build-stack.sh)
+# Assembles "Chili.app" from the built stack (scripts/build-stack.sh)
 # and the Swift launcher.
 #
-#   SPICE Client.app/Contents/
-#     MacOS/SPICE Client              Swift launcher (Proxmox, quick connect, .vv handler)
+#   Chili.app/Contents/
+#     MacOS/Chili              Swift launcher (Proxmox, quick connect, .vv handler)
 #     Resources/                      launcher icon + translations
-#     Helpers/SPICE Viewer.app/       remote-viewer and its whole runtime
+#     Helpers/Chili Viewer.app/       remote-viewer and its whole runtime
 #       Contents/MacOS/               remote-viewer, gst-plugin-scanner
 #       Contents/Frameworks/          every bundled dylib
 #       Contents/PlugIns/             GStreamer + gdk-pixbuf modules
@@ -16,8 +16,8 @@
 source "$(dirname "$0")/env.sh"
 source "$(dirname "$0")/lib.sh"
 
-BUNDLE_ID="${BUNDLE_ID:-io.github.edgarfraus.spice-client}"
-PROJECT_URL="${PROJECT_URL:-https://github.com/edgarfraus/Spice-Client-unofficial-for-macos}"
+BUNDLE_ID="${BUNDLE_ID:-io.github.edgarfraus.chili}"
+PROJECT_URL="${PROJECT_URL:-https://github.com/edgarfraus/chili-spice-macos}"
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
 VERSION="$(cat "$REPO_ROOT/VERSION")"
 BUILD="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
@@ -25,8 +25,8 @@ BUILD="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
 [[ -x "$PREFIX/bin/remote-viewer" ]] || die "remote-viewer not built yet: run scripts/build-stack.sh"
 
 OUT="$DIST_DIR/$ARCH"
-APP="$OUT/SPICE Client.app"
-VIEWER="$APP/Contents/Helpers/SPICE Viewer.app"
+APP="$OUT/Chili.app"
+VIEWER="$APP/Contents/Helpers/Chili Viewer.app"
 VC="$VIEWER/Contents"
 
 msg "Assembling $APP"
@@ -45,7 +45,7 @@ msg "Compiling launcher"
 swift_arch=$ARCH
 swiftc -swift-version 5 -O -whole-module-optimization \
     -target "$swift_arch-apple-macos12.0" -sdk "$SDKROOT" \
-    "$REPO_ROOT"/launcher/Sources/*.swift -o "$APP/Contents/MacOS/SPICE Client"
+    "$REPO_ROOT"/launcher/Sources/*.swift -o "$APP/Contents/MacOS/Chili"
 render "$REPO_ROOT/resources/Info.plist.in" "$APP/Contents/Info.plist"
 cp "$REPO_ROOT/resources/AppIcon.icns" "$APP/Contents/Resources/"
 cp -R "$REPO_ROOT"/launcher/Resources/*.lproj "$APP/Contents/Resources/"
