@@ -1,0 +1,114 @@
+/* Italiano */
+
+/* Sidebar & main window */
+"Quick Connect" = "Connessione rapida";
+"Proxmox Servers" = "Server Proxmox";
+"Edit…" = "Modifica…";
+"Remove" = "Rimuovi";
+"Add Server…" = "Aggiungi server…";
+"Pick a server or use Quick Connect" = "Scegli un server o usa la connessione rapida";
+
+/* Server view */
+"Connecting to %@…" = "Connessione a %@…";
+"Refresh" = "Aggiorna";
+"Refresh the VM list" = "Aggiorna l'elenco delle VM";
+"Log Out" = "Esci";
+"Log out" = "Esci";
+"Edit" = "Modifica";
+"Edit server" = "Modifica server";
+"Untrusted certificate" = "Certificato non attendibile";
+"%@ uses a certificate that macOS doesn't trust. This is normal for Proxmox, which generates a self-signed certificate on install.\n\nCompare this SHA-256 fingerprint with the one shown in Proxmox under Node → System → Certificates:\n\n%@" = "%@ usa un certificato di cui macOS non si fida. È normale con Proxmox, che all'installazione genera un certificato autofirmato.\n\nConfronta questa impronta SHA-256 con quella mostrata in Proxmox in Nodo → Sistema → Certificati:\n\n%@";
+"Trust and Continue" = "Considera attendibile e continua";
+"Two-factor code" = "Codice a due fattori";
+"Enter the 6-digit code from your authenticator app, or a recovery key." = "Inserisci il codice a 6 cifre della tua app di autenticazione, oppure una chiave di recupero.";
+"Token secret" = "Segreto del token";
+"Password" = "Password";
+"Log In" = "Accedi";
+"Filter" = "Filtra";
+"Show stopped VMs" = "Mostra VM spente";
+"No virtual machines on this server." = "Nessuna macchina virtuale su questo server.";
+"No VMs match the filter." = "Nessuna VM corrisponde al filtro.";
+"Start" = "Avvia";
+"Connect" = "Connetti";
+"Start & Connect" = "Avvia e connetti";
+"%d vCPU" = "%d vCPU";
+
+/* Server editor */
+"Add Proxmox Server" = "Aggiungi server Proxmox";
+"Edit Proxmox Server" = "Modifica server Proxmox";
+"Name" = "Nome";
+"My homelab" = "Il mio homelab";
+"Host" = "Host";
+"pve.example.com or 192.168.1.10" = "pve.example.com o 192.168.1.10";
+"Port" = "Porta";
+"Log in with" = "Accedi con";
+"API token" = "Token API";
+"User" = "Utente";
+"Realm" = "Realm";
+"unchanged" = "invariata";
+"Token ID" = "ID token";
+"Secret" = "Segreto";
+"Remember in Keychain" = "Ricorda nel Portachiavi";
+"The token needs the VM.Console and VM.Audit privileges (and VM.PowerMgmt to start VMs)." = "Il token richiede i privilegi VM.Console e VM.Audit (e VM.PowerMgmt per avviare le VM).";
+"Remove Server" = "Rimuovi server";
+"Cancel" = "Annulla";
+"Add" = "Aggiungi";
+"Save" = "Salva";
+"Linux PAM (pam)" = "Linux PAM (pam)";
+"Proxmox VE (pve)" = "Proxmox VE (pve)";
+
+/* Quick connect */
+"Connect directly to a SPICE server, for example a QEMU or libvirt VM started with -spice port=5900." = "Connettiti direttamente a un server SPICE, per esempio una VM QEMU o libvirt avviata con -spice port=5900.";
+"Use TLS (port is the TLS port)" = "Usa TLS (la porta è quella TLS)";
+"optional" = "facoltativa";
+"Open Connection File…" = "Apri file di connessione…";
+"Using Proxmox?" = "Usi Proxmox?";
+"Add your server in the sidebar to list its VMs and connect with one click. You can also open the .vv files that Proxmox downloads when you choose Console → SPICE." = "Aggiungi il tuo server nella barra laterale per vederne le VM e connetterti con un clic. Puoi anche aprire i file .vv che Proxmox scarica quando scegli Console → SPICE.";
+"Add Proxmox Server…" = "Aggiungi server Proxmox…";
+
+/* Settings */
+"Settings" = "Impostazioni";
+"Open viewer in full screen" = "Apri il visualizzatore a schermo intero";
+"Quit after the viewer closes when opened from a .vv file" = "Esci alla chiusura del visualizzatore se aperto da un file .vv";
+"Verbose viewer logging (for troubleshooting)" = "Log dettagliato del visualizzatore (per la diagnosi dei problemi)";
+"Show Viewer Logs" = "Mostra i log del visualizzatore";
+"Certificates Forgotten" = "Certificati dimenticati";
+"Forget Trusted Certificates" = "Dimentica i certificati attendibili";
+"Release the mouse and keyboard from the VM with Ctrl+Alt. Toggle full screen with Shift+F11 (Proxmox) or the toolbar button." = "Per liberare mouse e tastiera dalla VM premi Ctrl+Alt. Per lo schermo intero usa Maiusc+F11 (Proxmox) o il pulsante nella barra degli strumenti.";
+
+/* Menus */
+"About %@" = "Informazioni su %@";
+"Settings…" = "Impostazioni…";
+"Hide %@" = "Nascondi %@";
+"Hide Others" = "Nascondi altre";
+"Show All" = "Mostra tutte";
+"Quit %@" = "Esci da %@";
+"File" = "File";
+"New Proxmox Server…" = "Nuovo server Proxmox…";
+"Quick Connect…" = "Connessione rapida…";
+"Close Window" = "Chiudi finestra";
+"Undo" = "Annulla";
+"Redo" = "Ripristina";
+"Cut" = "Taglia";
+"Copy" = "Copia";
+"Paste" = "Incolla";
+"Select All" = "Seleziona tutto";
+"Window" = "Finestra";
+"Minimize" = "Contrai";
+"Zoom" = "Zoom";
+"Connections" = "Connessioni";
+"Help" = "Aiuto";
+"SPICE Client Guide" = "Guida di SPICE Client";
+
+/* Errors */
+"Something went wrong" = "Si è verificato un problema";
+"The bundled viewer is missing (%@). Please reinstall the app." = "Il visualizzatore incluso non è stato trovato (%@). Reinstalla l'app.";
+"The viewer quit unexpectedly (exit code %d)." = "Il visualizzatore si è chiuso inaspettatamente (codice di uscita %d).";
+"The certificate of %@ is not trusted." = "Il certificato di %@ non è attendibile.";
+"A two-factor authentication code is required." = "È richiesto un codice di autenticazione a due fattori.";
+"Authentication failed: check user name, realm and password." = "Autenticazione non riuscita: controlla nome utente, realm e password.";
+"Server error (HTTP %d)." = "Errore del server (HTTP %d).";
+"Unexpected response from the server." = "Risposta inattesa dal server.";
+"This VM has no SPICE display. In Proxmox, set Hardware → Display to “SPICE (qxl)” and restart the VM." = "Questa VM non ha un display SPICE. In Proxmox imposta Hardware → Display su “SPICE (qxl)” e riavvia la VM.";
+"The VM did not start within 30 seconds." = "La VM non si è avviata entro 30 secondi.";
+"Choose a .vv connection file (for example one downloaded from Proxmox)" = "Scegli un file di connessione .vv (per esempio uno scaricato da Proxmox)";

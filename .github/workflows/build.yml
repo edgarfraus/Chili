@@ -1,0 +1,129 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x86_64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 300
+    env:
+      ARCH: ${{ matrix.arch }}
+      BUNDLE_ID: io.github.${{ github.repository_owner }}.spice-client
+      PROJECT_URL: ${{ github.server_url }}/${{ github.repository }}
+      BUILD_NUMBER: ${{ github.run_number }}
+      HAS_SIGNING_CERT: ${{ secrets.MACOS_CERTIFICATE != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Restore built stack
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/${{ matrix.arch }}/prefix
+            build/${{ matrix.arch }}/tools
+            build/${{ matrix.arch }}/stamps
+          key: stack-${{ matrix.arch }}-${{ hashFiles('scripts/build-stack.sh', 'scripts/env.sh', 'scripts/lib.sh', 'patches/**') }}
+
+      - name: Build library stack
+        run: PYTHON="$(which python3)" scripts/build-stack.sh
+
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.arch }}
+          path: build/${{ matrix.arch }}/logs
+
+      - name: Import signing certificate
+        if: env.HAS_SIGNING_CERT == 'true'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          kc="$RUNNER_TEMP/signing.keychain-db"
+          security create-keychain -p ci "$kc"
+          security set-keychain-settings -lut 21600 "$kc"
+          security unlock-keychain -p ci "$kc"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MACOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$kc"
+          security set-key-partition-list -S apple-tool:,apple: -k ci "$kc"
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          identity=$(security find-identity -v -p codesigning "$kc" | awk -F'"' '/Developer ID Application/ {print $2; exit}')
+          echo "CODESIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+          if [ -n "$APPLE_ID" ]; then
+            xcrun notarytool store-credentials ci-notary --apple-id "$APPLE_ID" \
+              --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --keychain "$kc"
+            echo "NOTARY_PROFILE=ci-notary" >> "$GITHUB_ENV"
+          fi
+
+      - name: Bundle app
+        run: scripts/bundle-app.sh
+
+      - name: Smoke test
+        run: scripts/smoke-test.sh
+
+      - name: Make DMG
+        run: scripts/make-dmg.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dmg-${{ matrix.arch }}
+          path: dist/*.dmg*
+
+      # The GPL asks us to ship the corresponding source with the binaries.
+      - name: Collect sources
+        if: startsWith(github.ref, 'refs/tags/') && matrix.arch == 'arm64'
+        run: scripts/collect-sources.sh
+
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.ref, 'refs/tags/') && matrix.arch == 'arm64'
+        with:
+          name: sources
+          path: dist/*-sources.tar
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" artifacts/* \
+            --title "SPICE Client ${GITHUB_REF_NAME#v}" \
+            --notes-file .github/release-notes.md \
+            --verify-tag

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="660" height="420" viewBox="0 0 660 420">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F7F8FC"/>
+      <stop offset="1" stop-color="#E6E9F3"/>
+    </linearGradient>
+  </defs>
+  <rect width="660" height="420" fill="url(#g)"/>
+  <text x="330" y="58" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="22" font-weight="600" fill="#1C2550">SPICE Client</text>
+  <text x="330" y="84" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="13" fill="#5A6382">Drag the app into Applications · Trascina l'app in Applicazioni</text>
+  <!-- arrow between the two icons (icons sit at x=170 and x=490, y=205) -->
+  <path d="M262 205 H384" stroke="#8C95B5" stroke-width="6" stroke-linecap="round"/>
+  <path d="M372 187 L398 205 L372 223" stroke="#8C95B5" stroke-width="6" stroke-linecap="round"
+        stroke-linejoin="round" fill="none"/>
+  <text x="330" y="364" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="11.5" fill="#6B7391">First launch blocked? System Settings → Privacy &amp; Security → Open Anyway</text>
+  <text x="330" y="382" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="11.5" fill="#6B7391">Primo avvio bloccato? Impostazioni di Sistema → Privacy e sicurezza → Apri comunque</text>
+</svg>

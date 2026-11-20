@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2B3A8F"/>
+      <stop offset="1" stop-color="#0E1A4F"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1FB5C9"/>
+      <stop offset="1" stop-color="#0B6E8C"/>
+    </linearGradient>
+    <linearGradient id="chili" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF7A45"/>
+      <stop offset="1" stop-color="#D7263D"/>
+    </linearGradient>
+    <linearGradient id="stem" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7DDC6F"/>
+      <stop offset="1" stop-color="#2F9E44"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- macOS icon grid: 824×824 body centred on a 1024 canvas -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)" filter="url(#shadow)"/>
+
+  <!-- monitor -->
+  <g filter="url(#shadow)">
+    <rect x="212" y="262" width="600" height="400" rx="40" fill="#F4F6FB"/>
+    <rect x="244" y="294" width="536" height="336" rx="18" fill="url(#screen)"/>
+    <path d="M452 662 h120 l22 84 h-164 z" fill="#D9DEEA"/>
+    <rect x="372" y="740" width="280" height="34" rx="17" fill="#F4F6FB"/>
+  </g>
+
+  <!-- chili pepper on the screen -->
+  <g transform="translate(512 462) rotate(-28)">
+    <path d="M-150 -18 C-110 -64 40 -70 128 -30 C152 -18 156 10 132 18 C40 46 -60 70 -132 46 C-170 34 -176 12 -150 -18 z"
+          fill="url(#chili)"/>
+    <path d="M-120 -16 C-70 -46 30 -50 96 -26" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="14"
+          stroke-linecap="round" fill="none"/>
+    <path d="M128 -30 C150 -46 170 -44 182 -30 C176 -12 160 4 136 6 z" fill="url(#stem)"/>
+    <path d="M176 -36 C190 -62 214 -74 236 -72" stroke="#2F9E44" stroke-width="16" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>

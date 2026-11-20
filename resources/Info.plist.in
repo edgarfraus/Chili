@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>it</string>
+	</array>
+	<key>CFBundleDisplayName</key>
+	<string>SPICE Client</string>
+	<key>CFBundleName</key>
+	<string>SPICE Client</string>
+	<key>CFBundleExecutable</key>
+	<string>SPICE Client</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>@BUNDLE_ID@</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>@VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@BUILD@</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSSupportsAutomaticGraphicsSwitching</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>Open source, GPL-2.0-or-later. Bundles virt-viewer, spice-gtk, GTK and GStreamer.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>The virtual machine is asking to use your microphone (SPICE audio recording).</string>
+	<key>SCProjectURL</key>
+	<string>@PROJECT_URL@</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>SPICE Connection File</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>@BUNDLE_ID@.vv</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>AppIcon</string>
+		</dict>
+	</array>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>@BUNDLE_ID@.vv</string>
+			<key>UTTypeDescription</key>
+			<string>SPICE Connection File</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeIconFile</key>
+			<string>AppIcon</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>vv</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/x-virt-viewer</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>SPICE URL</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>spice</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
