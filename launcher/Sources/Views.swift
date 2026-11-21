@@ -6,11 +6,14 @@ struct ContentView: View {
     @EnvironmentObject var store: ProfileStore
 
     var body: some View {
+        // Selection-driven sidebar + a detail view that switches on the selection.
+        // NavigationLink(tag:selection:) lost the detail column on macOS when
+        // jumping between items, leaving an empty window.
         NavigationView {
             Sidebar()
-            Placeholder()
+            DetailView()
         }
-        .frame(minWidth: 760, minHeight: 460)
+        .frame(minWidth: 820, minHeight: 480)
         .sheet(item: $model.editingProfile) { profile in
             ServerEditor(profile: profile)
         }
@@ -25,36 +28,54 @@ private struct Sidebar: View {
     @EnvironmentObject var store: ProfileStore
 
     var body: some View {
-        List {
-            NavigationLink(tag: SidebarItem.quickConnect, selection: $model.selection) {
-                QuickConnectView()
-            } label: {
-                Label("Quick Connect", systemImage: "bolt.horizontal.circle")
-            }
+        List(selection: $model.selection) {
+            Label("Quick Connect", systemImage: "bolt.horizontal.circle")
+                .tag(SidebarItem.quickConnect)
 
             Section(header: Text("Proxmox Servers")) {
                 ForEach(store.profiles) { profile in
-                    NavigationLink(tag: SidebarItem.server(profile.id), selection: $model.selection) {
-                        ServerDetailView(session: model.session(for: profile))
-                    } label: {
-                        Label { Text(verbatim: profile.title) } icon: { Image(systemName: "server.rack") }
-                    }
-                    .contextMenu {
-                        Button("Edit…") { model.editingProfile = profile }
-                        Button("Remove") { model.delete(profile) }
-                    }
+                    Label { Text(verbatim: profile.title) } icon: { Image(systemName: "server.rack") }
+                        .tag(SidebarItem.server(profile.id))
+                        .contextMenu {
+                            Button("Edit…") { model.editingProfile = profile }
+                            Button("Remove") { model.delete(profile) }
+                        }
                 }
-                Button {
-                    model.editingProfile = ServerProfile()
-                } label: {
-                    Label("Add Server…", systemImage: "plus")
-                }
-                .buttonStyle(.plain)
-                .foregroundColor(.accentColor)
             }
         }
         .listStyle(.sidebar)
         .frame(minWidth: 200)
+        .safeAreaInset(edge: .bottom) {
+            Button {
+                model.editingProfile = ServerProfile()
+            } label: {
+                Label("Add Server…", systemImage: "plus")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.borderless)
+            .padding(10)
+        }
+    }
+}
+
+private struct DetailView: View {
+    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var store: ProfileStore
+
+    var body: some View {
+        switch model.selection {
+        case .quickConnect:
+            QuickConnectView()
+        case .server(let id):
+            if let profile = store.profiles.first(where: { $0.id == id }) {
+                ServerDetailView(session: model.session(for: profile))
+                    .id(profile.id)
+            } else {
+                Placeholder()
+            }
+        case nil:
+            Placeholder()
+        }
     }
 }
 
@@ -209,7 +230,7 @@ private struct VMListView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(shown) { vm in
-                    VMRow(vm: vm, busy: session.busyVM == vm.id,
+                    VMRow(vm: vm, usage: session.history[vm.id] ?? [], busy: session.busyVM == vm.id,
                           connect: { session.connect(vm) }, start: { session.start(vm) })
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: true))
@@ -220,6 +241,7 @@ private struct VMListView: View {
 
 private struct VMRow: View {
     let vm: ProxmoxVM
+    let usage: [UsageSample]
     let busy: Bool
     let connect: () -> Void
     let start: () -> Void
@@ -239,6 +261,9 @@ private struct VMRow: View {
                 Text(verbatim: details).font(.caption).foregroundColor(.secondary)
             }
             Spacer()
+            if vm.isRunning {
+                UsageView(vm: vm, samples: usage)
+            }
             if busy {
                 ProgressView().controlSize(.small)
             } else {
@@ -262,6 +287,101 @@ private struct VMRow: View {
     }
 }
 
+// MARK: - Resource monitor
+
+/// CPU sparkline, memory bar and network rate for one running VM.
+private struct UsageView: View {
+    let vm: ProxmoxVM
+    let samples: [UsageSample]
+
+    private var cpu: Double { samples.last?.cpu ?? vm.cpu ?? 0 }
+    private var memory: Double {
+        samples.last?.memory ?? ((vm.maxmem ?? 0) > 0 ? Double(vm.mem ?? 0) / Double(vm.maxmem!) : 0)
+    }
+
+    var body: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: "CPU \(Int((cpu * 100).rounded()))%")
+                    .font(.caption2.monospacedDigit()).foregroundColor(.secondary)
+                Sparkline(values: samples.map(\.cpu))
+                    .stroke(Self.color(for: cpu), lineWidth: 1.5)
+                    .background(Sparkline(values: samples.map(\.cpu), closed: true)
+                        .fill(Self.color(for: cpu).opacity(0.15)))
+                    .frame(width: 80, height: 18)
+            }
+            .help(Text("CPU usage over the last 5 minutes"))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: "RAM \(Self.bytes(vm.mem)) / \(Self.bytes(vm.maxmem))")
+                    .font(.caption2.monospacedDigit()).foregroundColor(.secondary)
+                Meter(value: memory, color: Self.color(for: memory))
+                    .frame(width: 110, height: 6)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: "↓ \(Self.rate(samples.last?.netIn))")
+                Text(verbatim: "↑ \(Self.rate(samples.last?.netOut))")
+            }
+            .font(.caption2.monospacedDigit())
+            .foregroundColor(.secondary)
+            .frame(width: 78, alignment: .leading)
+            .help(Text("Network traffic"))
+        }
+    }
+
+    static func color(for fraction: Double) -> Color {
+        fraction > 0.9 ? .red : fraction > 0.7 ? .orange : .accentColor
+    }
+
+    static func bytes(_ value: Int64?) -> String {
+        ByteCountFormatter.string(fromByteCount: value ?? 0, countStyle: .memory)
+    }
+
+    static func rate(_ value: Double?) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(value ?? 0), countStyle: .binary) + "/s"
+    }
+}
+
+private struct Sparkline: Shape {
+    let values: [Double]
+    var closed = false
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        guard values.count > 1 else {
+            p.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            return p
+        }
+        let step = rect.width / CGFloat(values.count - 1)
+        for (i, v) in values.enumerated() {
+            let pt = CGPoint(x: rect.minX + CGFloat(i) * step, y: rect.maxY - CGFloat(v) * rect.height)
+            i == 0 ? p.move(to: pt) : p.addLine(to: pt)
+        }
+        if closed {
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            p.closeSubpath()
+        }
+        return p
+    }
+}
+
+private struct Meter: View {
+    let value: Double
+    let color: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.secondary.opacity(0.2))
+                Capsule().fill(color).frame(width: max(geo.size.width * CGFloat(value), value > 0 ? 3 : 0))
+            }
+        }
+    }
+}
+
 // MARK: - Server editor
 
 struct ServerEditor: View {
@@ -273,7 +393,7 @@ struct ServerEditor: View {
 
     private var isNew: Bool { !model.profiles.profiles.contains { $0.id == profile.id } }
     private var canSave: Bool {
-        !profile.host.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !ProxmoxClient.normalizedHost(profile.host).isEmpty &&
         (profile.authMethod == .password ? !profile.username.isEmpty : profile.tokenID.contains("!"))
     }
 
@@ -318,7 +438,8 @@ struct ServerEditor: View {
                 Button("Cancel") { presentation.wrappedValue.dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button(isNew ? LocalizedStringKey("Add") : LocalizedStringKey("Save")) {
-                    profile.host = profile.host.trimmingCharacters(in: .whitespaces)
+                    if let p = ProxmoxClient.port(in: profile.host) { profile.port = p }
+                    profile.host = ProxmoxClient.normalizedHost(profile.host)
                     model.save(profile, secret: secret.isEmpty ? nil : secret)
                     presentation.wrappedValue.dismiss()
                 }
@@ -348,10 +469,11 @@ struct ServerEditor: View {
     }
 
     private func loadRealms() async {
-        let host = profile.host.trimmingCharacters(in: .whitespaces)
+        let host = ProxmoxClient.normalizedHost(profile.host)
         guard host.count > 3 else { return }
         try? await Task.sleep(nanoseconds: 600_000_000) // debounce typing
-        guard let list = try? await ProxmoxClient(host: host, port: profile.port).realms() else { return }
+        let port = ProxmoxClient.port(in: profile.host) ?? profile.port
+        guard let list = try? await ProxmoxClient(host: host, port: port).realms() else { return }
         realms = list
     }
 }

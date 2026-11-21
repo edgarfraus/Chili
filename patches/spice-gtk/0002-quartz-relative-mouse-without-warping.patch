@@ -1,0 +1,61 @@
+diff --git a/src/spice-widget.c b/src/spice-widget.c
+index 0486fff..0fb0eaa 100644
+--- a/src/spice-widget.c
++++ b/src/spice-widget.c
+@@ -50,6 +50,10 @@
+ #endif
+ #endif
+ 
++#ifdef GDK_WINDOWING_QUARTZ
++#include <CoreGraphics/CoreGraphics.h>
++#endif
++
+ #include "spice-widget.h"
+ #include "spice-widget-priv.h"
+ #include "spice-gtk-session-priv.h"
+@@ -1170,6 +1174,17 @@ static gboolean do_pointer_grab(SpiceDisplay *display)
+         g_warning("pointer grab failed %u", status);
+     } else {
+         d->mouse_grab_active = true;
++#ifdef GDK_WINDOWING_QUARTZ
++        {
++            /* macOS can't warp the pointer reliably (events are suppressed for
++             * a while after each warp, and the grab doesn't keep the cursor in
++             * the window). Freeze the cursor instead and read raw mouse deltas,
++             * like games do. */
++            int32_t dx, dy;
++            CGAssociateMouseAndMouseCursorPosition(false);
++            CGGetLastMouseDelta(&dx, &dy); /* discard the delta accumulated so far */
++        }
++#endif
+         g_signal_emit(display, signals[SPICE_DISPLAY_MOUSE_GRAB], 0, true);
+         spice_gtk_session_set_pointer_grabbed(d->gtk_session, true);
+         set_mouse_accel(display, FALSE);
+@@ -1279,6 +1294,10 @@ static void ungrab_pointer(SpiceDisplay *display)
+     GdkSeat *seat = spice_display_get_default_seat(display);
+     GdkDevice *pointer = gdk_seat_get_pointer(seat);
+ 
++#ifdef GDK_WINDOWING_QUARTZ
++    CGAssociateMouseAndMouseCursorPosition(true);
++#endif
++
+ #ifdef GDK_WINDOWING_WAYLAND
+     /* On Wayland, mixing the GdkSeat and the GdkDevice APIs leave the
+      * cursor unchanged because the GDK Wayland backend keeps a reference
+@@ -2171,6 +2190,16 @@ static gboolean motion_event(GtkWidget *widget, GdkEventMotion *motion)
+         }
+         break;
+     case SPICE_MOUSE_MODE_SERVER:
++#ifdef GDK_WINDOWING_QUARTZ
++        if (d->mouse_grab_active) {
++            int32_t qdx = 0, qdy = 0;
++            CGGetLastMouseDelta(&qdx, &qdy);
++            if (qdx != 0 || qdy != 0)
++                spice_inputs_channel_motion(d->inputs, qdx, qdy,
++                                            button_mask_gdk_to_spice(motion->state));
++        }
++        break;
++#endif
+         if (d->mouse_grab_active) {
+             gint dx = d->mouse_last_x != -1 ? x - d->mouse_last_x : 0;
+             gint dy = d->mouse_last_y != -1 ? y - d->mouse_last_y : 0;

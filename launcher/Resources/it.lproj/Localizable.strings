@@ -112,3 +112,8 @@
 "This VM has no SPICE display. In Proxmox, set Hardware → Display to “SPICE (qxl)” and restart the VM." = "Questa VM non ha un display SPICE. In Proxmox imposta Hardware → Display su “SPICE (qxl)” e riavvia la VM.";
 "The VM did not start within 30 seconds." = "La VM non si è avviata entro 30 secondi.";
 "Choose a .vv connection file (for example one downloaded from Proxmox)" = "Scegli un file di connessione .vv (per esempio uno scaricato da Proxmox)";
+
+/* Resource monitor */
+"CPU usage over the last 5 minutes" = "Uso della CPU negli ultimi 5 minuti";
+"Network traffic" = "Traffico di rete";
+"“%@” is not a valid host name or IP address." = "“%@” non è un nome host o un indirizzo IP valido.";

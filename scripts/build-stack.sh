@@ -319,7 +319,8 @@ lib_spice_protocol() {
 lib_spice_gtk() {
     local s; s=$(unpack "$(fetch "${SPICE_GTK[@]}")" spice-gtk)
     apply_patches spice-gtk "$s"
-    meson_build "$s" -Dgtk=enabled -Dwebdav=disabled -Dusbredir=disabled \
+    # CoreGraphics: relative mouse patch (CGAssociateMouseAndMouseCursorPosition).
+    LDFLAGS="$LDFLAGS -framework CoreGraphics" meson_build "$s" -Dgtk=enabled -Dwebdav=disabled -Dusbredir=disabled \
         -Dsmartcard=disabled -Dpolkit=disabled -Dsasl=disabled -Dlz4=enabled \
         -Dopus=enabled -Dintrospection=disabled -Dvapi=disabled -Dgtk_doc=disabled \
         -Dlibcap-ng=disabled -Dwayland-protocols=disabled -Dcoroutine=gthread -Dpie=false

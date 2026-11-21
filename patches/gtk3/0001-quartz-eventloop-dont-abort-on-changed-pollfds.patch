@@ -1,0 +1,25 @@
+diff --git a/gdk/quartz/gdkeventloop-quartz.c b/gdk/quartz/gdkeventloop-quartz.c
+index 8000576..2997867 100644
+--- a/gdk/quartz/gdkeventloop-quartz.c
++++ b/gdk/quartz/gdkeventloop-quartz.c
+@@ -581,9 +581,17 @@ select_thread_collect_poll (GPollFD *ufds, guint nfds)
+ 	{
+ 	  if (ufds[i].fd == -1)
+ 	    continue;
+-	  
+-	  g_assert (ufds[i].fd == current_pollfds[i].fd);
+-	  g_assert (ufds[i].events == current_pollfds[i].events);
++
++	  /* The set of polled fds can change while the select thread is
++	   * waiting (e.g. a nested main loop started by a clipboard request).
++	   * Report nothing ready instead of aborting: GLib simply polls again. */
++	  if (i >= current_n_pollfds ||
++	      ufds[i].fd != current_pollfds[i].fd ||
++	      ufds[i].events != current_pollfds[i].events)
++	    {
++	      n_ready = 0;
++	      break;
++	    }
+ 
+ 	  if (current_pollfds[i].revents)
+ 	    {

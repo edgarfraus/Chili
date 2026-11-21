@@ -12,6 +12,14 @@ struct ProxmoxVM: Identifiable, Hashable, Decodable {
     let maxmem: Int64?
     let maxcpu: Double?
     let uptime: Int?
+    // Live usage, refreshed by Proxmox (pvestatd) roughly every 10 seconds.
+    let cpu: Double?        // fraction of maxcpu, 0…1
+    let mem: Int64?
+    let maxdisk: Int64?
+    let netin: Int64?       // cumulative bytes
+    let netout: Int64?
+    let diskread: Int64?
+    let diskwrite: Int64?
 
     var id: String { "\(node)/\(vmid)" }
     var displayName: String { name ?? "VM \(vmid)" }
@@ -31,6 +39,7 @@ enum ProxmoxError: LocalizedError {
     case http(Int, String)
     case badResponse
     case noSpice
+    case invalidHost(String)
 
     var errorDescription: String? {
         switch self {
@@ -44,6 +53,8 @@ enum ProxmoxError: LocalizedError {
             return message.isEmpty ? String(format: NSLocalizedString("Server error (HTTP %d).", comment: ""), code) : message
         case .badResponse:
             return NSLocalizedString("Unexpected response from the server.", comment: "")
+        case .invalidHost(let host):
+            return String(format: NSLocalizedString("“%@” is not a valid host name or IP address.", comment: ""), host)
         case .noSpice:
             return NSLocalizedString("This VM has no SPICE display. In Proxmox, set Hardware → Display to “SPICE (qxl)” and restart the VM.", comment: "")
         }
@@ -63,7 +74,7 @@ final class ProxmoxClient: NSObject, URLSessionDelegate {
     private var session: URLSession!
 
     init(host: String, port: Int) {
-        self.host = host
+        self.host = Self.normalizedHost(host)
         self.port = port
         super.init()
         let cfg = URLSessionConfiguration.ephemeral
@@ -73,12 +84,42 @@ final class ProxmoxClient: NSObject, URLSessionDelegate {
 
     deinit { session.invalidateAndCancel() }
 
-    private var baseURL: URL {
+    private func baseURL() throws -> URL {
         var c = URLComponents()
         c.scheme = "https"
         c.host = host
         c.port = port
-        return c.url!
+        guard !host.isEmpty, let url = c.url else { throw ProxmoxError.invalidHost(host) }
+        return url
+    }
+
+    /// Accepts what people paste from the browser: "https://pve:8006/#v1:0:…" → "pve".
+    /// IPv6 literals keep their brackets, as URLComponents expects.
+    static func normalizedHost(_ input: String) -> String {
+        var h = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let r = h.range(of: "://") { h = String(h[r.upperBound...]) }
+        if let i = h.firstIndex(where: { "/?#".contains($0) }) { h = String(h[..<i]) }
+        if h.hasPrefix("[") {
+            if let close = h.firstIndex(of: "]") { h = String(h[...close]) }
+        } else if h.filter({ $0 == ":" }).count == 1, let colon = h.firstIndex(of: ":") {
+            h = String(h[..<colon])
+        } else if h.contains(":") {
+            h = "[\(h)]"     // bare IPv6 address
+        }
+        return h
+    }
+
+    /// The port in a pasted URL ("https://pve:8443"), if any.
+    static func port(in input: String) -> Int? {
+        var h = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let r = h.range(of: "://") { h = String(h[r.upperBound...]) }
+        if let i = h.firstIndex(where: { "/?#".contains($0) }) { h = String(h[..<i]) }
+        if h.hasPrefix("["), let close = h.firstIndex(of: "]") {
+            let rest = h[h.index(after: close)...]
+            return rest.hasPrefix(":") ? Int(rest.dropFirst()) : nil
+        }
+        let parts = h.split(separator: ":")
+        return parts.count == 2 ? Int(parts[1]) : nil
     }
 
     // MARK: Authentication
@@ -172,7 +213,8 @@ final class ProxmoxClient: NSObject, URLSessionDelegate {
 
     private func raw(_ method: String, _ path: String, form: [String: String]? = nil,
                      authenticated: Bool = true) async throws -> Data {
-        var req = URLRequest(url: URL(string: path, relativeTo: baseURL)!)
+        guard let url = URL(string: path, relativeTo: try baseURL()) else { throw ProxmoxError.invalidHost(host) }
+        var req = URLRequest(url: url)
         req.httpMethod = method
         if let form {
             var c = URLComponents()

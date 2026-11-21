@@ -56,6 +56,15 @@ final class AppModel: ObservableObject {
     }
 }
 
+/// One point of a VM's resource history.
+struct UsageSample {
+    let date: Date
+    let cpu: Double          // 0…1 of the VM's vCPUs
+    let memory: Double       // 0…1 of its RAM
+    let netIn: Double        // bytes/s
+    let netOut: Double
+}
+
 /// Login state and VM list of one Proxmox server.
 @MainActor
 final class ServerSession: ObservableObject {
@@ -76,6 +85,11 @@ final class ServerSession: ObservableObject {
     @Published var lastError: String?
     @Published var pendingCertificate: String?
     @Published var lastRefresh: Date?
+    /// Recent usage per VM id, newest last (about 5 minutes).
+    @Published private(set) var history: [String: [UsageSample]] = [:]
+    private var lastNetCounters: [String: (date: Date, netIn: Int64, netOut: Int64)] = [:]
+    static let refreshInterval: TimeInterval = 5
+    private static let historyLength = 60
 
     private var password = ""
     private var refreshTimer: Timer?
@@ -138,6 +152,33 @@ final class ServerSession: ObservableObject {
     func reload() async throws {
         vms = try await client.virtualMachines()
         lastRefresh = Date()
+        recordUsage()
+    }
+
+    private func recordUsage() {
+        let now = Date()
+        for vm in vms {
+            guard vm.isRunning else {
+                history[vm.id] = nil
+                lastNetCounters[vm.id] = nil
+                continue
+            }
+            var netIn = 0.0, netOut = 0.0
+            if let inBytes = vm.netin, let outBytes = vm.netout {
+                if let last = lastNetCounters[vm.id], now.timeIntervalSince(last.date) > 0.5,
+                   inBytes >= last.netIn, outBytes >= last.netOut {
+                    let dt = now.timeIntervalSince(last.date)
+                    netIn = Double(inBytes - last.netIn) / dt
+                    netOut = Double(outBytes - last.netOut) / dt
+                }
+                lastNetCounters[vm.id] = (now, inBytes, outBytes)
+            }
+            let memory = (vm.maxmem ?? 0) > 0 ? Double(vm.mem ?? 0) / Double(vm.maxmem!) : 0
+            let sample = UsageSample(date: now, cpu: min(max(vm.cpu ?? 0, 0), 1), memory: min(memory, 1),
+                                     netIn: netIn, netOut: netOut)
+            history[vm.id, default: []].append(sample)
+            if history[vm.id]!.count > Self.historyLength { history[vm.id]!.removeFirst() }
+        }
     }
 
     func refresh() {
@@ -148,7 +189,7 @@ final class ServerSession: ObservableObject {
 
     private func startAutoRefresh() {
         refreshTimer?.invalidate()
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in try? await self?.reload() }
         }
     }
