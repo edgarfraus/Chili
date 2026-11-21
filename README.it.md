@@ -45,8 +45,13 @@ piccola interfaccia nativa che parla con Proxmox VE al posto tuo.
 - **Proxmox VE integrato.** Accedi una volta (password, autenticazione a due fattori TOTP o token API),
   vedi tutte le VM del cluster, fai doppio clic per aprire la console. Le VM spente si avviano
   direttamente dall'elenco.
+- **Console integrata, tutto in una finestra.** Le console si aprono dentro Chili, elencate nella barra
+  laterale accanto ai server; ognuna si può spostare in una finestra propria (o a schermo intero) e
+  riportare indietro. Display, tastiera, mouse, appunti e audio nativi di macOS, scritti direttamente su
+  spice-glib: nessuna finestra GTK.
 - **Apre i file `.vv`**: quelli che scarica l'interfaccia web di Proxmox (*Console → SPICE*) o che
-  producono oVirt e virt-manager si aprono con un doppio clic.
+  producono oVirt e virt-manager si aprono con un doppio clic in una finestra con la sola console, senza
+  il resto dell'app.
 - **Connessione rapida** a qualsiasi server SPICE indicando host e porta, e supporto ai link `spice://`.
 - **Autosufficiente.** Niente Homebrew, MacPorts o XQuartz: GTK usa il backend nativo Cocoa (Quartz).
 - **Audio** in uscita e microfono tramite GStreamer, **decodifica hardware H.264/H.265** tramite
@@ -140,7 +145,9 @@ WebAuthn/YubiKey non sono supportati: usa un token API.
 
 L'elenco mostra tutte le VM del cluster, con nodo, vCPU e memoria, e si aggiorna ogni 5 secondi. Per le VM accese mostra in tempo reale due contagiri per CPU e memoria e il traffico di rete.
 
-- Fai doppio clic su una VM, oppure clic su **Connetti**.
+- Fai doppio clic su una VM, oppure clic su **Connetti**: la console si apre nella finestra principale e
+  compare in **Console** nella barra laterale. Il pulsante con la finestra accanto a *Connetti* la apre
+  invece in una finestra separata.
 - Per una VM spenta, **Avvia e connetti** la accende e apre la console appena è pronta.
 - Usa il campo di ricerca per filtrare per nome o ID della VM.
 
@@ -208,15 +215,17 @@ connessione…** (⌘O) apre qualsiasi file `.vv`.
 
 | Azione | Come |
 |---|---|
-| Liberare mouse e tastiera dalla VM | **Ctrl+Alt** (sessioni Proxmox: **Ctrl+Alt+R**) |
-| Schermo intero | **Maiusc+F11** (Proxmox), o il pulsante schermo intero nella barra del visualizzatore |
-| Inviare Ctrl+Alt+Canc e altre combinazioni | menu tastiera nella barra → *Invia tasto* |
+| Controllare la VM | fai clic dentro la console |
+| Liberare il mouse quando è catturato | **Ctrl+Alt** (il mouse viene catturato solo se l'ospite non ha agente/tablet, per esempio durante l'installazione di Windows) |
+| Schermo intero / finestra separata | pulsanti nella barra, o clic destro sulla console nella barra laterale |
+| Inviare Ctrl+Alt+Canc | pulsante nella barra |
 | Cambiare risoluzione | ridimensiona la finestra (serve l'agente SPICE nell'ospite) |
 | Copia e incolla tra Mac e VM | copia e incolla normalmente (serve l'agente SPICE) |
 
-Il tasto **⌘ Comando** arriva alla VM come tasto *Super / Windows*. In **Chili →
-Impostazioni** puoi scegliere di aprire sempre il visualizzatore a schermo intero e attivare il log
-dettagliato.
+Il tasto **⌘ Comando** arriva alla VM come tasto *Super / Windows* (le scorciatoie dell'app come ⌘Q
+funzionano comunque). In **Chili → Impostazioni** puoi scegliere dove si aprono le console, lo schermo
+intero, se la VM segue la dimensione della finestra (anche in risoluzione Retina), la condivisione degli
+appunti, e tornare al visualizzatore classico `remote-viewer`.
 
 ## Risoluzione dei problemi
 

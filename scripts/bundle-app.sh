@@ -3,7 +3,8 @@
 # and the Swift launcher.
 #
 #   Chili.app/Contents/
-#     MacOS/Chili              Swift launcher (Proxmox, quick connect, .vv handler)
+#     MacOS/Chili                     launcher: Proxmox, quick connect, built-in SPICE console
+#                                     (SpiceKit on spice-glib), .vv handler
 #     Resources/                      launcher icon + translations
 #     Helpers/Chili Viewer.app/       remote-viewer and its whole runtime
 #       Contents/MacOS/               remote-viewer, gst-plugin-scanner
@@ -42,10 +43,7 @@ render() {  # render TEMPLATE DEST
 
 # --- Launcher --------------------------------------------------------------
 msg "Compiling launcher"
-swift_arch=$ARCH
-swiftc -swift-version 5 -O -whole-module-optimization \
-    -target "$swift_arch-apple-macos12.0" -sdk "$SDKROOT" \
-    "$REPO_ROOT"/launcher/Sources/*.swift -o "$APP/Contents/MacOS/Chili"
+"$REPO_ROOT/scripts/build-launcher.sh" "$APP/Contents/MacOS/Chili"
 render "$REPO_ROOT/resources/Info.plist.in" "$APP/Contents/Info.plist"
 cp "$REPO_ROOT/resources/AppIcon.icns" "$APP/Contents/Resources/"
 cp -R "$REPO_ROOT"/launcher/Resources/*.lproj "$APP/Contents/Resources/"
@@ -87,7 +85,9 @@ cp -R "$REPO_ROOT/resources/etc/" "$VC/Resources/etc/"
 
 # --- Make it self-contained ------------------------------------------------
 msg "Relocating libraries"
-roots=("$VC/MacOS/remote-viewer" "$VC/MacOS/gst-plugin-scanner" "$VC"/Resources/lib/gstreamer-1.0/*.dylib)
+# The launcher's built-in console links spice-glib too; it shares the helper's Frameworks.
+roots=("$APP/Contents/MacOS/Chili" "$VC/MacOS/remote-viewer" "$VC/MacOS/gst-plugin-scanner"
+       "$VC"/Resources/lib/gstreamer-1.0/*.dylib)
 for so in "$VC"/Resources/lib/gdk-pixbuf/loaders/*; do [[ -e "$so" ]] && roots+=("$so"); done
 "$TOOLS/venv/bin/python3" "$REPO_ROOT/scripts/relocate.py" \
     --prefix "$PREFIX" --frameworks "$VC/Frameworks" --bundle "$APP" "${roots[@]}"

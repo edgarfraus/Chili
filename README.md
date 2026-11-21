@@ -44,8 +44,11 @@ that talks to Proxmox VE for you.
 
 - **Proxmox VE built in.** Log in once (password, TOTP two-factor or API token), see all VMs of your
   cluster, double-click to open a console. Stopped VMs can be started from the list.
+- **Built-in console, all in one window.** Consoles open inside Chili, listed in the sidebar next to your
+  servers; any of them can be moved to its own window (or full screen) and back. Native macOS display,
+  keyboard, mouse, clipboard and audio, written directly on spice-glib — no GTK window involved.
 - **Opens `.vv` files.** The files that the Proxmox web UI downloads (*Console → SPICE*), or that oVirt
-  and virt-manager produce, open with a double-click.
+  and virt-manager produce, open with a double-click in a bare console window, without the rest of the app.
 - **Quick Connect** to any SPICE server by host and port, and `spice://` links.
 - **Self-contained.** No Homebrew, MacPorts or XQuartz. Native Cocoa (Quartz) GTK backend.
 - **Audio** playback and microphone via GStreamer, **hardware H.264/H.265 decoding** via VideoToolbox.
@@ -131,7 +134,8 @@ password. Recovery keys work too. WebAuthn/YubiKey-only accounts are not support
 
 The list shows every VM in the cluster, with its node, vCPUs and memory, and refreshes every 5 seconds. Running VMs show live CPU and memory dials and network traffic.
 
-- Double-click a VM, or click **Connect**.
+- Double-click a VM, or click **Connect**: the console opens in the main window and appears under
+  **Consoles** in the sidebar. The window button next to *Connect* opens it in a separate window instead.
 - For a stopped VM, **Start & Connect** boots it and opens the console as soon as it is up.
 - Use the filter field to search by name or VM ID.
 
@@ -198,14 +202,16 @@ Links of the form `spice://host:5900` also open in Chili, and **File → Open Co
 
 | Action | How |
 |---|---|
-| Release mouse and keyboard from the VM | **Ctrl+Alt** (Proxmox sessions: **Ctrl+Alt+R**) |
-| Full screen | **Shift+F11** (Proxmox), or the full-screen button in the viewer toolbar |
-| Send Ctrl+Alt+Del and other key combinations | toolbar keyboard menu → *Send key* |
+| Control the VM | click inside the console |
+| Release the mouse when it's captured | **Ctrl+Alt** (the mouse is captured only while the guest has no agent/tablet, e.g. during Windows setup) |
+| Full screen / separate window | toolbar buttons, or right-click the console in the sidebar |
+| Send Ctrl+Alt+Del | toolbar button |
 | Change resolution | resize the window (needs the SPICE agent in the guest) |
 | Copy and paste between Mac and VM | just copy and paste (needs the SPICE agent) |
 
-The **⌘ Command** key is sent to the VM as the *Super / Windows* key. In **Chili → Settings**
-you can choose to always open the viewer in full screen and turn on verbose logging.
+The **⌘ Command** key is sent to the VM as the *Super / Windows* key (app shortcuts such as ⌘Q still
+work). In **Chili → Settings** you can choose where consoles open, full screen, whether the VM follows the
+window size (and at Retina resolution), clipboard sharing, and fall back to the classic `remote-viewer`.
 
 ## Troubleshooting
 

@@ -14,6 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         Prefs.registerDefaults()
+        let paths = ViewerLauncher.shared.runtimePaths
+        CSSpiceInitialize(paths.gstPlugins, paths.gstScanner, paths.gstRegistry)
+        model.showMainWindow = { [weak self] in self?.showMainWindow() }
         NSApp.mainMenu = MainMenu.build(target: self)
         NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleURLEvent(_:reply:)),
                                                      forEventClass: AEEventClass(kInternetEventClass),
@@ -31,7 +34,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NotificationCenter.default.addObserver(forName: .viewerExited, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.quitIfIdle() }
         }
+        NotificationCenter.default.addObserver(forName: .consolesChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.quitIfIdle() }
+        }
         if !openedDocumentsAtLaunch { showMainWindow() }
+        startDebugSnapshotsIfRequested()
+    }
+
+    /// Development aid: CHILI_DEBUG_SNAPSHOT=/dir makes the app save PNGs of its own
+    /// windows every few seconds (no screen-recording permission needed for those).
+    private func startDebugSnapshotsIfRequested() {
+        guard let dir = ProcessInfo.processInfo.environment["CHILI_DEBUG_SNAPSHOT"] else { return }
+        var n = 0
+        Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
+            n += 1
+            for (i, w) in NSApp.windows.enumerated() where w.isVisible {
+                guard let view = w.contentView?.superview ?? w.contentView,
+                      let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
+                view.cacheDisplay(in: view.bounds, to: rep)
+                let url = URL(fileURLWithPath: dir).appendingPathComponent("snap-\(n)-\(i).png")
+                try? rep.representation(using: .png, properties: [:])?.write(to: url)
+            }
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
@@ -40,6 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        model.disconnectAll()
+    }
 
     // MARK: Documents and URLs
 
@@ -55,24 +83,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         open(url)
     }
 
+    /// .vv files and spice:// links open a bare console window, without the main window.
     private func open(_ url: URL) {
+        let classic = UserDefaults.standard.bool(forKey: Prefs.useClassicViewer)
         do {
             if url.isFileURL {
-                try ViewerLauncher.shared.launch(arguments: [url.path])
-            } else if ["spice", "spice+tls", "spice+unix"].contains(url.scheme?.lowercased() ?? "") {
-                try ViewerLauncher.shared.launch(arguments: [url.absoluteString])
+                NSDocumentController.shared.noteNewRecentDocumentURL(url)
+                if classic { return try ViewerLauncher.shared.launch(arguments: [url.path]) }
+                let text = try String(contentsOf: url, encoding: .utf8)
+                let config = ViewerConfig(vvText: text)
+                guard config["host"] != nil || config["proxy"] != nil else {
+                    throw ViewerError.invalidFile(url.lastPathComponent)
+                }
+                // Proxmox marks its one-time tickets for deletion once read.
+                if config["delete-this-file"] == "1" { try? FileManager.default.removeItem(at: url) }
+                model.openConsole(config: config, title: config["title"] ?? url.deletingPathExtension().lastPathComponent,
+                                  placement: .standalone)
+            } else if ["spice", "spice+tls"].contains(url.scheme?.lowercased() ?? "") {
+                if classic { return try ViewerLauncher.shared.launch(arguments: [url.absoluteString]) }
+                guard let host = url.host else { throw ViewerError.invalidFile(url.absoluteString) }
+                var config = ViewerConfig()
+                config["host"] = host
+                let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+                let tls = url.scheme?.lowercased() == "spice+tls"
+                if let p = url.port { config[tls ? "tls-port" : "port"] = String(p) }
+                for item in query {
+                    if item.name == "port" || item.name == "tls-port" || item.name == "password" { config[item.name] = item.value }
+                }
+                if let password = url.password { config["password"] = password }
+                model.openConsole(config: config, title: host, placement: .standalone)
             }
-            NSDocumentController.shared.noteNewRecentDocumentURL(url)
         } catch {
             showMainWindow()
             model.present(error)
         }
     }
 
-    /// When the app was only started to open a .vv file, leave once the viewer closes.
+    /// When the app was only started to open a .vv file, leave once its console closes.
     private func quitIfIdle() {
         guard openedDocumentsAtLaunch, UserDefaults.standard.bool(forKey: Prefs.quitAfterLaunch),
-              !ViewerLauncher.shared.hasRunningViewers, mainWindow?.isVisible != true else { return }
+              !ViewerLauncher.shared.hasRunningViewers, model.consoles.isEmpty,
+              mainWindow?.isVisible != true else { return }
         NSApp.terminate(nil)
     }
 
@@ -100,7 +151,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc func showSettings() {
         if settingsWindow == nil {
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 300),
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
                                   styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.title = NSLocalizedString("Settings", comment: "")
             window.contentView = NSHostingView(rootView: SettingsView())

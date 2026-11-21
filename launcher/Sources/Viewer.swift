@@ -42,8 +42,19 @@ enum Prefs {
     static let quitAfterLaunch = "quitAfterOpeningFile"
     static let debugLog = "viewerDebugLog"
 
+    static let resizeGuest = "resizeGuestToWindow"
+    static let retinaResolution = "retinaResolution"
+    static let shareClipboard = "shareClipboard"
+    static let consolePlacement = "consolePlacement"     // "main" or "window"
+    static let useClassicViewer = "useClassicViewer"     // remote-viewer instead of the built-in console
+
     static func registerDefaults() {
         UserDefaults.standard.register(defaults: [
+            resizeGuest: true,
+            retinaResolution: false,
+            shareClipboard: true,
+            consolePlacement: "main",
+            useClassicViewer: false,
             fullscreen: false,
             quitAfterLaunch: true,
             debugLog: false,
@@ -53,12 +64,15 @@ enum Prefs {
 
 enum ViewerError: LocalizedError {
     case missingViewer(String)
+    case invalidFile(String)
     case exitedEarly(Int32, String)
 
     var errorDescription: String? {
         switch self {
         case .missingViewer(let path):
             return String(format: NSLocalizedString("The bundled viewer is missing (%@). Please reinstall the app.", comment: ""), path)
+        case .invalidFile(let name):
+            return String(format: NSLocalizedString("“%@” is not a valid SPICE connection file.", comment: ""), name)
         case .exitedEarly(let code, let log):
             let head = String(format: NSLocalizedString("The viewer quit unexpectedly (exit code %d).", comment: ""), code)
             return log.isEmpty ? head : head + "\n\n" + log
@@ -98,6 +112,13 @@ final class ViewerLauncher {
     }()
 
     var hasRunningViewers: Bool { running.contains { $0.isRunning } }
+
+    /// GStreamer locations for the built-in console's audio and video decoding.
+    var runtimePaths: (gstPlugins: String, gstScanner: String, gstRegistry: String) {
+        (plugins.appendingPathComponent("gstreamer-1.0").path,
+         viewerApp.appendingPathComponent("Contents/MacOS/gst-plugin-scanner").path,
+         cacheDir.appendingPathComponent("gst-registry-console-\(Self.arch).bin").path)
+    }
 
     /// Opens a connection described by `config` (written to a private temp file).
     func launch(config: ViewerConfig, title: String? = nil) throws {

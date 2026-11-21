@@ -4,6 +4,7 @@ import SwiftUI
 enum SidebarItem: Hashable {
     case quickConnect
     case server(UUID)
+    case console(UUID)
 }
 
 struct AlertInfo: Identifiable {
@@ -18,8 +19,11 @@ final class AppModel: ObservableObject {
     @Published var selection: SidebarItem? = .quickConnect
     @Published var editingProfile: ServerProfile?
     @Published var alert: AlertInfo?
+    @Published private(set) var consoles: [ConsoleSession] = []
 
     private var sessions: [UUID: ServerSession] = [:]
+    /// Called when the main window must be shown (a console was added to it).
+    var showMainWindow: (() -> Void)?
 
     init() {
         if let first = profiles.profiles.first { selection = .server(first.id) }
@@ -47,6 +51,73 @@ final class AppModel: ObservableObject {
         profiles.delete(profile)
         sessions[profile.id] = nil
         if selection == .server(profile.id) { selection = .quickConnect }
+    }
+
+    // MARK: Consoles
+
+    enum Placement { case mainWindow, window, standalone }
+
+    /// Opens a SPICE console. `.standalone` is for .vv files: a bare window, no main window.
+    func openConsole(config: ViewerConfig, title: String, placement: Placement? = nil,
+                     reconnect: (() async throws -> ViewerConfig)? = nil) {
+        if UserDefaults.standard.bool(forKey: Prefs.useClassicViewer) {
+            do { try ViewerLauncher.shared.launch(config: config, title: title) } catch { present(error) }
+            return
+        }
+        let session = ConsoleSession(config: config, title: config["title"] ?? title, reconnect: reconnect)
+        consoles.append(session)
+        let wantsFullScreen = config["fullscreen"] == "1" || UserDefaults.standard.bool(forKey: Prefs.fullscreen)
+        let where_ = placement ?? (UserDefaults.standard.string(forKey: Prefs.consolePlacement) == "window"
+                                   ? .window : .mainWindow)
+        switch where_ {
+        case .mainWindow where !wantsFullScreen:
+            selection = .console(session.id)
+            showMainWindow?()
+        default:
+            detach(session, fullScreen: wantsFullScreen)
+        }
+    }
+
+    func detach(_ session: ConsoleSession, fullScreen: Bool = false) {
+        if session.window == nil {
+            session.window = ConsoleWindowController(session: session, model: self)
+        }
+        session.window?.showWindow(nil)
+        if fullScreen, let w = session.window?.window, !w.styleMask.contains(.fullScreen) {
+            DispatchQueue.main.async { w.toggleFullScreen(nil) }
+        }
+        if selection == .console(session.id) { selection = consoles.last(where: { $0.window == nil }).map { .console($0.id) } ?? .quickConnect }
+    }
+
+    func attachToMainWindow(_ session: ConsoleSession) {
+        guard let controller = session.window else { return }
+        session.window = nil
+        controller.window?.delegate = nil
+        controller.close()
+        selection = .console(session.id)
+        showMainWindow?()
+    }
+
+    func close(_ session: ConsoleSession) {
+        session.disconnect()
+        if let controller = session.window {
+            session.window = nil
+            controller.window?.delegate = nil
+            controller.close()
+        }
+        consoles.removeAll { $0 === session }
+        if selection == .console(session.id) { selection = consoles.last.map { .console($0.id) } ?? .quickConnect }
+        NotificationCenter.default.post(name: .consolesChanged, object: nil)
+    }
+
+    func consoleWindowClosed(_ controller: ConsoleWindowController) {
+        // Closing a console window closes that console.
+        controller.session.window = nil
+        close(controller.session)
+    }
+
+    func disconnectAll() {
+        for c in consoles { c.disconnect() }
     }
 
     func present(_ error: Error?) {
@@ -195,7 +266,7 @@ final class ServerSession: ObservableObject {
     }
 
     /// Opens the VM's console, starting the VM first if needed.
-    func connect(_ vm: ProxmoxVM) {
+    func connect(_ vm: ProxmoxVM, placement: AppModel.Placement? = nil) {
         busyVM = vm.id
         Task {
             defer { busyVM = nil }
@@ -205,7 +276,9 @@ final class ServerSession: ObservableObject {
                     try await waitUntilRunning(vm)
                 }
                 let config = try await client.spiceConfig(for: vm)
-                try ViewerLauncher.shared.launch(config: config, title: "\(vm.displayName) (\(vm.vmid))")
+                let client = self.client
+                app?.openConsole(config: config, title: "\(vm.displayName) (\(vm.vmid))", placement: placement,
+                                 reconnect: { try await client.spiceConfig(for: vm) })
             } catch {
                 app?.present(error)
             }
@@ -237,4 +310,8 @@ final class ServerSession: ObservableObject {
         }
         throw ProxmoxError.http(0, NSLocalizedString("The VM did not start within 30 seconds.", comment: ""))
     }
+}
+
+extension Notification.Name {
+    static let consolesChanged = Notification.Name("ChiliConsolesChanged")
 }

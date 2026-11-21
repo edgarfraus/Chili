@@ -29,6 +29,19 @@ private struct Sidebar: View {
 
     var body: some View {
         List(selection: $model.selection) {
+            if !model.consoles.isEmpty {
+                Section(header: Text("Consoles")) {
+                    ForEach(model.consoles) { console in
+                        ConsoleRow(session: console)
+                            .tag(SidebarItem.console(console.id))
+                            .contextMenu {
+                                Button("Open in Window") { model.detach(console) }
+                                Button("Disconnect") { model.close(console) }
+                            }
+                    }
+                }
+            }
+
             Label("Quick Connect", systemImage: "bolt.horizontal.circle")
                 .tag(SidebarItem.quickConnect)
 
@@ -58,6 +71,27 @@ private struct Sidebar: View {
     }
 }
 
+private struct ConsoleRow: View {
+    @ObservedObject var session: ConsoleSession
+
+    var body: some View {
+        Label {
+            Text(verbatim: session.title)
+        } icon: {
+            Image(systemName: session.window == nil ? "display" : "macwindow")
+                .foregroundColor(color)
+        }
+    }
+
+    private var color: Color {
+        switch session.state {
+        case .connected: return .green
+        case .connecting: return .orange
+        default: return .secondary
+        }
+    }
+}
+
 private struct DetailView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: ProfileStore
@@ -66,6 +100,13 @@ private struct DetailView: View {
         switch model.selection {
         case .quickConnect:
             QuickConnectView()
+        case .console(let id):
+            if let session = model.consoles.first(where: { $0.id == id }) {
+                ConsoleView(session: session, inMainWindow: true)
+                    .id(session.id)
+            } else {
+                Placeholder()
+            }
         case .server(let id):
             if let profile = store.profiles.first(where: { $0.id == id }) {
                 ServerDetailView(session: model.session(for: profile))
@@ -231,7 +272,9 @@ private struct VMListView: View {
             } else {
                 List(shown) { vm in
                     VMRow(vm: vm, usage: session.history[vm.id] ?? [], busy: session.busyVM == vm.id,
-                          connect: { session.connect(vm) }, start: { session.start(vm) })
+                          connect: { session.connect(vm) },
+                          connectInWindow: { session.connect(vm, placement: .window) },
+                          start: { session.start(vm) })
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: true))
             }
@@ -244,6 +287,7 @@ private struct VMRow: View {
     let usage: [UsageSample]
     let busy: Bool
     let connect: () -> Void
+    let connectInWindow: () -> Void
     let start: () -> Void
 
     var body: some View {
@@ -272,6 +316,8 @@ private struct VMRow: View {
                 }
                 Button(vm.isRunning ? LocalizedStringKey("Connect") : LocalizedStringKey("Start & Connect"), action: connect)
                     .buttonStyle(.borderedProminent)
+                Button(action: connectInWindow) { Image(systemName: "macwindow.badge.plus") }
+                    .help("Open the console in a separate window")
             }
         }
         .padding(.vertical, 4)
@@ -546,27 +592,40 @@ struct QuickConnectView: View {
         config["host"] = host.trimmingCharacters(in: .whitespaces)
         config[tls ? "tls-port" : "port"] = String(port)
         if !password.isEmpty { config["password"] = password }
-        do {
-            try ViewerLauncher.shared.launch(config: config, title: host)
-        } catch {
-            model.present(error)
-        }
+        model.openConsole(config: config, title: "\(config["host"] ?? host):\(port)")
     }
 }
 
 // MARK: - Settings
 
 struct SettingsView: View {
+    @AppStorage(Prefs.consolePlacement) private var placement = "main"
     @AppStorage(Prefs.fullscreen) private var fullscreen = false
+    @AppStorage(Prefs.resizeGuest) private var resizeGuest = true
+    @AppStorage(Prefs.retinaResolution) private var retina = false
+    @AppStorage(Prefs.shareClipboard) private var shareClipboard = true
+    @AppStorage(Prefs.useClassicViewer) private var classicViewer = false
     @AppStorage(Prefs.quitAfterLaunch) private var quitAfterLaunch = true
     @AppStorage(Prefs.debugLog) private var debugLog = false
     @State private var resetDone = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Toggle("Open viewer in full screen", isOn: $fullscreen)
-            Toggle("Quit after the viewer closes when opened from a .vv file", isOn: $quitAfterLaunch)
-            Toggle("Verbose viewer logging (for troubleshooting)", isOn: $debugLog)
+        VStack(alignment: .leading, spacing: 12) {
+            Picker("Open consoles", selection: $placement) {
+                Text("In the main window").tag("main")
+                Text("In separate windows").tag("window")
+            }
+            .pickerStyle(.radioGroup)
+            Toggle("Open consoles in full screen", isOn: $fullscreen)
+            Toggle("Resize the VM display to the window (needs the SPICE agent)", isOn: $resizeGuest)
+            Toggle("Use Retina resolution (sharper, smaller text in the VM)", isOn: $retina)
+                .disabled(!resizeGuest)
+            Toggle("Share the clipboard with the VM", isOn: $shareClipboard)
+            Divider()
+            Toggle("Quit after the console closes when opened from a .vv file", isOn: $quitAfterLaunch)
+            Toggle("Use the classic viewer (remote-viewer) instead of the built-in console", isOn: $classicViewer)
+            Toggle("Verbose classic viewer logging (for troubleshooting)", isOn: $debugLog)
+                .disabled(!classicViewer)
             HStack {
                 Button("Show Viewer Logs") { NSWorkspace.shared.open(ViewerLauncher.shared.logDir) }
                 Button(resetDone ? LocalizedStringKey("Certificates Forgotten") : LocalizedStringKey("Forget Trusted Certificates")) {
@@ -576,11 +635,11 @@ struct SettingsView: View {
                 .disabled(resetDone)
             }
             Spacer()
-            Text("Release the mouse and keyboard from the VM with Ctrl+Alt. Toggle full screen with Shift+F11 (Proxmox) or the toolbar button.")
+            Text("Click inside a console to control the VM. If the mouse gets captured, press Ctrl+Alt to release it. Settings apply to consoles opened afterwards.")
                 .font(.caption).foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(20)
-        .frame(width: 460, height: 230, alignment: .topLeading)
+        .frame(width: 500, height: 400, alignment: .topLeading)
     }
 }

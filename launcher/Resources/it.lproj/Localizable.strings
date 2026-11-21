@@ -116,3 +116,45 @@
 /* Resource monitor */
 "Network traffic" = "Traffico di rete";
 "“%@” is not a valid host name or IP address." = "“%@” non è un nome host o un indirizzo IP valido.";
+
+/* Built-in console */
+"Consoles" = "Console";
+"Open in Window" = "Apri in una finestra";
+"Disconnect" = "Disconnetti";
+"Ctrl+Alt+Del" = "Ctrl+Alt+Canc";
+"Send Ctrl+Alt+Del" = "Invia Ctrl+Alt+Canc";
+"Open this console in a separate window" = "Apri questa console in una finestra separata";
+"Full Screen" = "Schermo intero";
+"Move to Main Window" = "Sposta nella finestra principale";
+"Move this console back to the main window" = "Riporta questa console nella finestra principale";
+"Disconnect and close this console" = "Disconnetti e chiudi questa console";
+"Connecting…" = "Connessione…";
+"Disconnected" = "Disconnesso";
+"Reconnect" = "Riconnetti";
+"Close" = "Chiudi";
+"Press Ctrl+Alt to release the mouse" = "Premi Ctrl+Alt per liberare il mouse";
+"Click inside to control the mouse" = "Fai clic all'interno per controllare il mouse";
+"This console is open in a separate window." = "Questa console è aperta in una finestra separata.";
+"Show Window" = "Mostra finestra";
+"Move Here" = "Sposta qui";
+"Open the console in a separate window" = "Apri la console in una finestra separata";
+"“%@” is not a valid SPICE connection file." = "“%@” non è un file di connessione SPICE valido.";
+"Could not start the connection." = "Impossibile avviare la connessione.";
+"Authentication failed: the password or ticket was refused (Proxmox tickets expire after about 30 seconds)." = "Autenticazione non riuscita: password o ticket rifiutati (i ticket di Proxmox scadono dopo circa 30 secondi).";
+"Secure connection failed (TLS)." = "Connessione sicura non riuscita (TLS).";
+"Could not connect to the SPICE server." = "Impossibile connettersi al server SPICE.";
+"The SPICE server refused the connection." = "Il server SPICE ha rifiutato la connessione.";
+"The connection was interrupted." = "La connessione si è interrotta.";
+
+/* Settings */
+"Open consoles" = "Apri le console";
+"In the main window" = "Nella finestra principale";
+"In separate windows" = "In finestre separate";
+"Open consoles in full screen" = "Apri le console a schermo intero";
+"Resize the VM display to the window (needs the SPICE agent)" = "Adatta la risoluzione della VM alla finestra (serve l'agente SPICE)";
+"Use Retina resolution (sharper, smaller text in the VM)" = "Usa la risoluzione Retina (più nitida, testo più piccolo nella VM)";
+"Share the clipboard with the VM" = "Condividi gli appunti con la VM";
+"Quit after the console closes when opened from a .vv file" = "Esci alla chiusura della console se aperta da un file .vv";
+"Use the classic viewer (remote-viewer) instead of the built-in console" = "Usa il visualizzatore classico (remote-viewer) invece della console integrata";
+"Verbose classic viewer logging (for troubleshooting)" = "Log dettagliato del visualizzatore classico (per la diagnosi)";
+"Click inside a console to control the VM. If the mouse gets captured, press Ctrl+Alt to release it. Settings apply to consoles opened afterwards." = "Fai clic in una console per controllare la VM. Se il mouse resta catturato, premi Ctrl+Alt per liberarlo. Le impostazioni valgono per le console aperte dopo la modifica.";
