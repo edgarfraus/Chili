@@ -37,7 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NotificationCenter.default.addObserver(forName: .consolesChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.quitIfIdle() }
         }
-        if !openedDocumentsAtLaunch { showMainWindow() }
+        let layoutPreview = ProcessInfo.processInfo.environment["CHILI_DEBUG_ACTION"]?.hasPrefix("wizard") == true
+        if !openedDocumentsAtLaunch && !layoutPreview { showMainWindow() }
         startDebugSnapshotsIfRequested()
     }
 
@@ -75,7 +76,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         model.disconnectAll()
     }
 
+    private var debugWindows: [NSWindow] = []
+
     private func runDebugAction(_ action: String) {
+        if action.hasPrefix("wizard") {   // layout preview, no server needed
+            let custom = action.contains("custom")
+            let os: VMDraft.OS = action.contains("win") ? .win11 : .linux
+            debugWindows.append(DebugActions.previewWizard(app: model, recommended: !custom, os: os))
+            return
+        }
         guard let profile = model.profiles.profiles.first else { return }
         let session = model.session(for: profile)
         let parts = action.split(separator: ":").map(String.init)

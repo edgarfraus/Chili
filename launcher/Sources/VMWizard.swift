@@ -120,6 +120,12 @@ struct VMWizardView: View {
         _model = StateObject(wrappedValue: VMWizardModel(session: session))
     }
 
+    /// For previews: a model that is already filled in.
+    init(model: VMWizardModel, recommended: Bool = true) {
+        _model = StateObject(wrappedValue: model)
+        _recommended = State(initialValue: recommended)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
@@ -136,6 +142,7 @@ struct VMWizardView: View {
                     .font(.callout).foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(20)
             Divider()
             ScrollView {
@@ -149,13 +156,13 @@ struct VMWizardView: View {
                     }
                 }
                 .padding(20)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(width: 600, alignment: .leading)
             }
             Divider()
             footer.padding(16)
         }
-        .frame(width: 600, height: 640)
-        .task { await model.load() }
+        .frame(width: 640, height: 680)
+        .task { if model.nodes.isEmpty { await model.load() } }
         .onChange(of: model.draft.os) { os in
             model.osChanged(from: previousOS)
             previousOS = os
@@ -190,6 +197,50 @@ struct VMWizardView: View {
     }
 }
 
+// MARK: - Layout
+
+/// One form row: right-aligned label column, control on the right. (SwiftUI's
+/// Form inside a ScrollView has no width on macOS and lays out off-screen.)
+private struct Row<Content: View>: View {
+    let label: LocalizedStringKey?
+    @ViewBuilder let content: Content
+
+    init(_ label: LocalizedStringKey?, @ViewBuilder content: () -> Content) {
+        self.label = label
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Group {
+                if let label { Text(label) } else { Text(verbatim: "") }
+            }
+            .frame(width: 160, alignment: .trailing)
+            content
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct SectionBox<Content: View>: View {
+    let title: LocalizedStringKey
+    @ViewBuilder let content: Content
+
+    init(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title).font(.headline)
+            VStack(alignment: .leading, spacing: 10) { content }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
+        }
+    }
+}
+
 // MARK: - Shared pieces
 
 private struct NodePicker: View {
@@ -197,10 +248,14 @@ private struct NodePicker: View {
 
     var body: some View {
         if model.nodes.count > 1 {
-            Picker("Node", selection: $model.draft.node) {
-                ForEach(model.nodes, id: \.self) { Text($0).tag($0) }
+            Row("Node") {
+                Picker("", selection: $model.draft.node) {
+                    ForEach(model.nodes, id: \.self) { Text($0).tag($0) }
+                }
+                .labelsHidden()
+                .frame(maxWidth: 260, alignment: .leading)
+                .onChange(of: model.draft.node) { _ in Task { await model.loadNode() } }
             }
-            .onChange(of: model.draft.node) { _ in Task { await model.loadNode() } }
         }
     }
 }
@@ -211,11 +266,14 @@ private struct ISOPicker: View {
     @Binding var selection: String?
 
     var body: some View {
-        Picker(title, selection: $selection) {
-            Text("None").tag(String?.none)
-            ForEach(isos) { iso in
-                Text(verbatim: iso.fileName).tag(Optional(iso.volid))
+        Row(title) {
+            Picker("", selection: $selection) {
+                Text("None").tag(String?.none)
+                ForEach(isos) { iso in
+                    Text(verbatim: iso.fileName).tag(Optional(iso.volid))
+                }
             }
+            .labelsHidden()
         }
     }
 }
@@ -226,10 +284,14 @@ private struct StoragePicker: View {
     @Binding var selection: String
 
     var body: some View {
-        Picker(title, selection: $selection) {
-            ForEach(storages) { s in
-                Text(verbatim: label(s)).tag(s.storage)
+        Row(title) {
+            Picker("", selection: $selection) {
+                ForEach(storages) { s in
+                    Text(verbatim: label(s)).tag(s.storage)
+                }
             }
+            .labelsHidden()
+            .frame(maxWidth: 320, alignment: .leading)
         }
     }
 
@@ -245,14 +307,39 @@ private struct BridgePicker: View {
     @Binding var selection: String
 
     var body: some View {
-        Picker("Network", selection: $selection) {
-            ForEach(bridges) { b in
-                Text(verbatim: b.comments.map { "\(b.iface) — \($0.trimmingCharacters(in: .whitespacesAndNewlines))" } ?? b.iface)
-                    .tag(b.iface)
+        Row("Network") {
+            Picker("", selection: $selection) {
+                ForEach(bridges) { b in
+                    Text(verbatim: b.comments.map { "\(b.iface) — \($0.trimmingCharacters(in: .whitespacesAndNewlines))" } ?? b.iface)
+                        .tag(b.iface)
+                }
             }
+            .labelsHidden()
+            .frame(maxWidth: 320, alignment: .leading)
         }
     }
 }
+
+private struct ChoiceRow<T: Hashable, Item: Identifiable>: View {
+    let title: LocalizedStringKey
+    let items: [Item]
+    @Binding var selection: T
+    let tag: (Item) -> T
+    let text: (Item) -> String
+    var width: CGFloat = 260
+
+    var body: some View {
+        Row(title) {
+            Picker("", selection: $selection) {
+                ForEach(items) { Text(verbatim: text($0)).tag(tag($0)) }
+            }
+            .labelsHidden()
+            .frame(maxWidth: width, alignment: .leading)
+        }
+    }
+}
+
+private struct StringChoice: Identifiable { let value: String; var id: String { value } }
 
 private struct NumberField: View {
     let title: LocalizedStringKey
@@ -262,16 +349,25 @@ private struct NumberField: View {
     var unit: String = ""
 
     var body: some View {
-        Stepper(value: $value, in: range, step: step) {
-            HStack {
-                Text(title)
-                Spacer()
+        Row(title) {
+            HStack(spacing: 6) {
                 TextField("", value: $value, formatter: NumberFormatter())
+                    .textFieldStyle(.roundedBorder)
                     .multilineTextAlignment(.trailing)
-                    .frame(width: 70)
+                    .frame(width: 90)
+                Stepper("", value: $value, in: range, step: step).labelsHidden()
                 if !unit.isEmpty { Text(verbatim: unit).foregroundColor(.secondary) }
             }
         }
+    }
+}
+
+private struct CheckRow: View {
+    let title: LocalizedStringKey
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Row(nil) { Toggle(title, isOn: $isOn) }
     }
 }
 
@@ -285,20 +381,25 @@ private struct RecommendedForm: View {
     }
 
     var body: some View {
-        Form {
+        VStack(alignment: .leading, spacing: 12) {
             NodePicker(model: model)
-            TextField("Name", text: $model.draft.name, prompt: Text(verbatim: "win11-office"))
-            Picker("Operating system", selection: $model.draft.os) {
-                ForEach(VMDraft.OS.allCases) { Text(verbatim: $0.label).tag($0) }
+            Row("Name") {
+                TextField("", text: $model.draft.name, prompt: Text(verbatim: "win11-office"))
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 260)
             }
+            ChoiceRow(title: "Operating system", items: VMDraft.OS.allCases, selection: $model.draft.os,
+                      tag: { $0 }, text: { $0.label }, width: 320)
             ISOPicker(title: "Installation ISO", isos: model.isos, selection: $model.draft.iso)
             if model.draft.os.isWindows {
                 ISOPicker(title: "VirtIO drivers ISO", isos: model.isos, selection: $model.draft.virtioISO)
-                Text(model.draft.virtioISO == nil
-                     ? "Without the drivers ISO, Chili uses SATA and Intel network devices that Windows recognises by itself."
-                     : "During setup, load the disk driver from the VirtIO CD (vioscsi\\w11\\amd64), then install virtio-win-guest-tools for networking, clipboard and resizing.")
-                    .font(.caption).foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Row(nil) {
+                    Text(model.draft.virtioISO == nil
+                         ? "Without the drivers ISO, Chili uses SATA and Intel network devices that Windows recognises by itself."
+                         : "During setup, load the disk driver from the VirtIO CD (vioscsi\\w11\\amd64), then install virtio-win-guest-tools for networking, clipboard and resizing.")
+                        .font(.caption).foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Divider().padding(.vertical, 4)
             NumberField(title: "CPU cores", value: $model.draft.cores, range: 1...model.maxCores)
@@ -307,8 +408,11 @@ private struct RecommendedForm: View {
             StoragePicker(title: "Disk storage", storages: model.diskStorages, selection: $model.draft.diskStorage)
             BridgePicker(bridges: model.bridges, selection: $model.draft.bridge)
             Divider().padding(.vertical, 4)
-            Toggle("Start the VM and open its console", isOn: $model.draft.startAfterCreate)
-            Text(verbatim: "ID \(model.draft.vmid)").font(.caption).foregroundColor(.secondary)
+            CheckRow(title: "Start the VM and open its console", isOn: $model.draft.startAfterCreate)
+            Row(nil) {
+                Text(verbatim: "ID \(model.draft.vmid) · CPU \(model.draft.recommendedCPUType)")
+                    .font(.caption).foregroundColor(.secondary)
+            }
         }
     }
 }
@@ -320,92 +424,80 @@ private struct CustomForm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            section("General") {
+            SectionBox("General") {
                 NodePicker(model: model)
                 NumberField(title: "VM ID", value: $model.draft.vmid, range: 100...999_999_999)
-                TextField("Name", text: $model.draft.name)
-                Toggle("Start at boot", isOn: $model.draft.startAtBoot)
-            }
-            section("OS") {
-                ISOPicker(title: "Installation ISO", isos: model.isos, selection: $model.draft.iso)
-                Picker("Guest OS type", selection: $model.draft.os) {
-                    ForEach(VMDraft.OS.allCases) { Text(verbatim: $0.label).tag($0) }
+                Row("Name") {
+                    TextField("", text: $model.draft.name).textFieldStyle(.roundedBorder).frame(maxWidth: 260)
                 }
+                CheckRow(title: "Start at boot", isOn: $model.draft.startAtBoot)
+            }
+            SectionBox("OS") {
+                ISOPicker(title: "Installation ISO", isos: model.isos, selection: $model.draft.iso)
+                ChoiceRow(title: "Guest OS type", items: VMDraft.OS.allCases, selection: $model.draft.os,
+                          tag: { $0 }, text: { $0.label }, width: 320)
                 if model.draft.os.isWindows {
                     ISOPicker(title: "VirtIO drivers ISO", isos: model.isos, selection: $model.draft.virtioISO)
                 }
             }
-            section("System") {
-                Picker("Machine", selection: $model.draft.machine) {
-                    ForEach(VMDraft.Machine.allCases) { Text(verbatim: $0.rawValue).tag($0) }
-                }
-                Picker("BIOS", selection: $model.draft.bios) {
-                    ForEach(VMDraft.BIOS.allCases) { Text(verbatim: $0.label).tag($0) }
-                }
+            SectionBox("System") {
+                ChoiceRow(title: "Machine", items: VMDraft.Machine.allCases, selection: $model.draft.machine,
+                          tag: { $0 }, text: { $0.rawValue }, width: 160)
+                ChoiceRow(title: "BIOS", items: VMDraft.BIOS.allCases, selection: $model.draft.bios,
+                          tag: { $0 }, text: { $0.label }, width: 200)
                 if model.draft.bios == .ovmf || model.draft.addTPM {
                     StoragePicker(title: "EFI/TPM storage", storages: model.diskStorages, selection: $model.draft.efiStorage)
                 }
-                Toggle("Add TPM 2.0", isOn: $model.draft.addTPM)
-                Picker("SCSI controller", selection: $model.draft.scsiController) {
-                    ForEach(VMDraft.scsiControllers, id: \.self) { Text(verbatim: $0).tag($0) }
-                }
-                Toggle("QEMU guest agent", isOn: $model.draft.guestAgent)
+                CheckRow(title: "Add TPM 2.0", isOn: $model.draft.addTPM)
+                ChoiceRow(title: "SCSI controller", items: VMDraft.scsiControllers.map(StringChoice.init),
+                          selection: $model.draft.scsiController, tag: { $0.value }, text: { $0.value }, width: 220)
+                CheckRow(title: "QEMU guest agent", isOn: $model.draft.guestAgent)
             }
-            section("Disk") {
-                Picker("Bus", selection: $model.draft.diskBus) {
-                    ForEach(VMDraft.Bus.allCases) { Text(verbatim: $0.label).tag($0) }
-                }
+            SectionBox("Disk") {
+                ChoiceRow(title: "Bus", items: VMDraft.Bus.allCases, selection: $model.draft.diskBus,
+                          tag: { $0 }, text: { $0.label }, width: 200)
                 StoragePicker(title: "Storage", storages: model.diskStorages, selection: $model.draft.diskStorage)
                 NumberField(title: "Size", value: $model.draft.diskSizeGB, range: 1...65536, unit: "GB")
-                Picker("Cache", selection: $model.draft.diskCache) {
-                    ForEach(VMDraft.cacheModes, id: \.self) { Text(verbatim: $0.isEmpty ? NSLocalizedString("Default (no cache)", comment: "") : $0).tag($0) }
-                }
-                Toggle("Discard", isOn: $model.draft.discard)
-                Toggle("IO thread", isOn: $model.draft.ioThread)
-                Toggle("SSD emulation", isOn: $model.draft.ssdEmulation)
+                ChoiceRow(title: "Cache", items: VMDraft.cacheModes.map(StringChoice.init), selection: $model.draft.diskCache,
+                          tag: { $0.value },
+                          text: { $0.value.isEmpty ? NSLocalizedString("Default (no cache)", comment: "") : $0.value },
+                          width: 220)
+                CheckRow(title: "Discard", isOn: $model.draft.discard)
+                CheckRow(title: "IO thread", isOn: $model.draft.ioThread)
+                CheckRow(title: "SSD emulation", isOn: $model.draft.ssdEmulation)
             }
-            section("CPU") {
+            SectionBox("CPU") {
                 NumberField(title: "Sockets", value: $model.draft.sockets, range: 1...4)
                 NumberField(title: "Cores", value: $model.draft.cores, range: 1...model.maxCores)
-                Picker("Type", selection: $model.draft.cpuType) {
-                    ForEach(VMDraft.cpuTypes, id: \.self) { Text(verbatim: $0).tag($0) }
-                }
+                ChoiceRow(title: "Type", items: VMDraft.cpuTypes.map(StringChoice.init), selection: $model.draft.cpuType,
+                          tag: { $0.value }, text: { $0.value }, width: 220)
             }
-            section("Memory") {
+            SectionBox("Memory") {
                 NumberField(title: "Memory", value: $model.draft.memoryMiB, range: 256...model.maxMemoryMiB, step: 512, unit: "MiB")
-                Toggle("Ballooning device", isOn: $model.draft.ballooning)
+                CheckRow(title: "Ballooning device", isOn: $model.draft.ballooning)
                 if model.draft.ballooning {
                     NumberField(title: "Minimum memory", value: $model.draft.minMemoryMiB, range: 0...model.draft.memoryMiB,
                                 step: 512, unit: "MiB")
                 }
             }
-            section("Network") {
+            SectionBox("Network") {
                 BridgePicker(bridges: model.bridges, selection: $model.draft.bridge)
-                Picker("Model", selection: $model.draft.netModel) {
-                    ForEach(VMDraft.NetModel.allCases) { Text(verbatim: $0.label).tag($0) }
-                }
+                ChoiceRow(title: "Model", items: VMDraft.NetModel.allCases, selection: $model.draft.netModel,
+                          tag: { $0 }, text: { $0.label }, width: 260)
                 NumberField(title: "VLAN tag (0 = none)", value: $model.draft.vlanTag, range: 0...4094)
-                Toggle("Firewall", isOn: $model.draft.firewall)
+                CheckRow(title: "Firewall", isOn: $model.draft.firewall)
             }
-            section("Display & audio") {
-                Picker("Display", selection: $model.draft.display) {
-                    ForEach(VMDraft.Display.allCases) { Text(verbatim: $0.label).tag($0) }
-                }
+            SectionBox("Display & audio") {
+                ChoiceRow(title: "Display", items: VMDraft.Display.allCases, selection: $model.draft.display,
+                          tag: { $0 }, text: { $0.label }, width: 260)
                 if model.draft.display == .spice {
                     NumberField(title: "Monitors", value: $model.draft.monitors, range: 1...4)
-                    Toggle("SPICE audio", isOn: $model.draft.audio)
+                    CheckRow(title: "SPICE audio", isOn: $model.draft.audio)
                 }
             }
-            section("After creation") {
-                Toggle("Start the VM and open its console", isOn: $model.draft.startAfterCreate)
+            SectionBox("After creation") {
+                CheckRow(title: "Start the VM and open its console", isOn: $model.draft.startAfterCreate)
             }
-        }
-    }
-
-    private func section<Content: View>(_ title: LocalizedStringKey, @ViewBuilder _ content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.headline)
-            Form { content() }
         }
     }
 }

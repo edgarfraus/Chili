@@ -1,4 +1,5 @@
-import Foundation
+import AppKit
+import SwiftUI
 
 /// Development aid, enabled only through CHILI_DEBUG_ACTION (see main.swift).
 /// Exercises the VM wizard code against a real server and logs to stderr.
@@ -107,5 +108,36 @@ enum DebugActions {
         for vm in session.vms where vm.vmid != 100 && vm.vmid != 101 {
             await deleteVM(session, vm)   // only deletes chili-test-* (checked against the config)
         }
+    }
+
+    /// Shows the wizard with made-up inventory (no login, no Keychain) to check its layout.
+    static func previewWizard(app: AppModel, recommended: Bool, os: VMDraft.OS) -> NSWindow {
+        let profile = ServerProfile(name: "Preview", host: "preview.invalid")
+        let model = VMWizardModel(session: ServerSession(profile: profile, app: app))
+        model.nodes = ["pve01"]
+        model.diskStorages = [
+            .init(storage: "local-lvm", type: "lvmthin", content: "images", avail: 151_636_672_512, total: nil, active: 1),
+            .init(storage: "Data-SSD", type: "nfs", content: "images,iso", avail: 288_513_327_104, total: nil, active: 1),
+        ]
+        model.isos = [.init(volid: "Data-SSD:iso/Windows-11-30072025.iso", size: nil),
+                      .init(volid: "Data-SSD:iso/virtio-win.iso", size: nil),
+                      .init(volid: "Data-SSD:iso/alpine-standard-3.22.0-x86_64.iso", size: nil)]
+        model.bridges = [.init(iface: "vmbr0", type: "bridge", active: 1, comments: nil)]
+        model.maxCores = 12
+        model.maxMemoryMiB = 15_770
+        model.draft.node = "pve01"
+        model.draft.vmid = 106
+        model.draft.os = os
+        model.draft.diskStorage = "local-lvm"
+        model.draft.efiStorage = "local-lvm"
+        model.draft.bridge = "vmbr0"
+        model.draft.virtioISO = "Data-SSD:iso/virtio-win.iso"
+        model.loading = false
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 680),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentView = NSHostingView(rootView: VMWizardView(model: model, recommended: recommended))
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        return window
     }
 }
