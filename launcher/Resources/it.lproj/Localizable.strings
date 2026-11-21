@@ -158,3 +158,14 @@
 "Use the classic viewer (remote-viewer) instead of the built-in console" = "Usa il visualizzatore classico (remote-viewer) invece della console integrata";
 "Verbose classic viewer logging (for troubleshooting)" = "Log dettagliato del visualizzatore classico (per la diagnosi)";
 "Click inside a console to control the VM. If the mouse gets captured, press Ctrl+Alt to release it. Settings apply to consoles opened afterwards." = "Fai clic in una console per controllare la VM. Se il mouse resta catturato, premi Ctrl+Alt per liberarlo. Le impostazioni valgono per le console aperte dopo la modifica.";
+
+/* Web consoles (noVNC / xterm.js) */
+"Open in Separate Window" = "Apri in una finestra separata";
+"noVNC Console" = "Console noVNC";
+"noVNC Console in Separate Window" = "Console noVNC in una finestra separata";
+"More ways to open the console" = "Altri modi per aprire la console";
+"Shell" = "Shell";
+"Open a shell on a node" = "Apri una shell su un nodo";
+"Container" = "Container";
+"Shell – %@" = "Shell – %@";
+"The noVNC and shell consoles need a password login: Proxmox' web pages can't use API tokens." = "Le console noVNC e la shell richiedono l'accesso con password: le pagine web di Proxmox non accettano i token API.";

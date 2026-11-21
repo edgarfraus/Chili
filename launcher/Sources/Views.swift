@@ -155,6 +155,7 @@ struct ServerDetailView: View {
         .toolbar {
             ToolbarItemGroup {
                 if session.state == .ready {
+                    NodeShellMenu(session: session)
                     Button { session.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
                         .help("Refresh the VM list")
                     Button { session.logout() } label: { Label("Log Out", systemImage: "rectangle.portrait.and.arrow.right") }
@@ -172,6 +173,24 @@ struct ServerDetailView: View {
                   primaryButton: .default(Text("Trust and Continue")) { session.trustPendingCertificate() },
                   secondaryButton: .cancel())
         }
+    }
+}
+
+/// Toolbar menu: open a root shell on one of the cluster's nodes (xterm.js).
+private struct NodeShellMenu: View {
+    @ObservedObject var session: ServerSession
+    @State private var nodes: [String] = []
+
+    var body: some View {
+        Menu {
+            ForEach(nodes, id: \.self) { node in
+                Button(node) { session.openWebConsole(.nodeShell(node)) }
+            }
+        } label: {
+            Label("Shell", systemImage: "terminal")
+        }
+        .help("Open a shell on a node")
+        .task { nodes = await session.loadNodes() }
     }
 }
 
@@ -272,9 +291,7 @@ private struct VMListView: View {
             } else {
                 List(shown) { vm in
                     VMRow(vm: vm, usage: session.history[vm.id] ?? [], busy: session.busyVM == vm.id,
-                          connect: { session.connect(vm) },
-                          connectInWindow: { session.connect(vm, placement: .window) },
-                          start: { session.start(vm) })
+                          session: session)
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: true))
             }
@@ -286,9 +303,10 @@ private struct VMRow: View {
     let vm: ProxmoxVM
     let usage: [UsageSample]
     let busy: Bool
-    let connect: () -> Void
-    let connectInWindow: () -> Void
-    let start: () -> Void
+    let session: ServerSession
+
+    private func connect() { session.connect(vm) }
+    private func start() { session.start(vm) }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -316,8 +334,19 @@ private struct VMRow: View {
                 }
                 Button(vm.isRunning ? LocalizedStringKey("Connect") : LocalizedStringKey("Start & Connect"), action: connect)
                     .buttonStyle(.borderedProminent)
-                Button(action: connectInWindow) { Image(systemName: "macwindow.badge.plus") }
-                    .help("Open the console in a separate window")
+                Menu {
+                    Button("Open in Separate Window") { session.connect(vm, placement: .window) }
+                    if !vm.isContainer {
+                        Divider()
+                        Button("noVNC Console") { session.openWebConsole(.vm(vm), placement: .mainWindow) }
+                        Button("noVNC Console in Separate Window") { session.openWebConsole(.vm(vm), placement: .window) }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help("More ways to open the console")
             }
         }
         .padding(.vertical, 4)
@@ -326,7 +355,7 @@ private struct VMRow: View {
     }
 
     private var details: String {
-        var parts = [vm.node]
+        var parts = [vm.isContainer ? NSLocalizedString("Container", comment: "") + " · " + vm.node : vm.node]
         if let cpu = vm.maxcpu { parts.append(String(format: NSLocalizedString("%d vCPU", comment: ""), Int(cpu))) }
         if let mem = vm.maxmem { parts.append(ByteCountFormatter.string(fromByteCount: mem, countStyle: .memory)) }
         return parts.joined(separator: " · ")

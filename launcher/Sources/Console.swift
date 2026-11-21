@@ -1,17 +1,29 @@
 import AppKit
 import SwiftUI
+import WebKit
 
-/// One open SPICE console. It lives either in the main window (sidebar →
-/// "Consoles") or in its own window; the display view moves between the two.
+/// One open console: either the native SPICE display or Proxmox' own web
+/// console (noVNC for VMs, xterm.js for containers and node shells). It lives
+/// in the main window (sidebar → "Consoles") or in its own window; its view
+/// moves between the two.
 @MainActor
-final class ConsoleSession: ObservableObject, Identifiable {
+final class ConsoleSession: NSObject, ObservableObject, Identifiable {
     let id = UUID()
     let title: String
-    let view = CSDisplayView(frame: NSRect(x: 0, y: 0, width: 1024, height: 768))
-    /// Fetches fresh connection options (Proxmox tickets are single-use).
-    private let reconnectOptions: (() async throws -> ViewerConfig)?
+    /// The view shown for this console (CSDisplayView or WKWebView).
+    let displayView: NSView
+    let spiceView: CSDisplayView?
+    private let webView: WKWebView?
+    var isWeb: Bool { webView != nil }
 
-    @Published private(set) var connection: CSConnection
+    /// SPICE: fetches fresh connection options (Proxmox tickets are single-use).
+    private let reconnectOptions: (() async throws -> ViewerConfig)?
+    /// Web: fresh login cookie + URL, since Proxmox tickets expire.
+    private let webReload: (() async throws -> (URL, HTTPCookie?))?
+    /// Web: certificate pinned by the user for this server.
+    private let trustedHost: (host: String, port: Int)?
+
+    @Published private(set) var connection: CSConnection?
     @Published private(set) var state: CSConnectionState = .connecting
     @Published private(set) var errorMessage: String?
     @Published private(set) var pointerCaptured = false
@@ -21,11 +33,34 @@ final class ConsoleSession: ObservableObject, Identifiable {
 
     init(config: ViewerConfig, title: String, reconnect: (() async throws -> ViewerConfig)? = nil) {
         self.title = title
-        self.reconnectOptions = reconnect
-        connection = Self.makeConnection(config)
+        let view = CSDisplayView(frame: NSRect(x: 0, y: 0, width: 1024, height: 768))
+        spiceView = view
+        displayView = view
+        webView = nil
+        reconnectOptions = reconnect
+        webReload = nil
+        trustedHost = nil
+        super.init()
         view.captureChanged = { [weak self] captured in self?.pointerCaptured = captured }
-        applyPreferences()
-        attach(connection)
+        attach(Self.makeConnection(config))
+    }
+
+    init(webTitle: String, host: String, port: Int, load: @escaping () async throws -> (URL, HTTPCookie?)) {
+        title = webTitle
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .nonPersistent()
+        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        let web = WKWebView(frame: NSRect(x: 0, y: 0, width: 1024, height: 768), configuration: config)
+        webView = web
+        displayView = web
+        spiceView = nil
+        reconnectOptions = nil
+        webReload = load
+        trustedHost = (host, port)
+        super.init()
+        web.navigationDelegate = self
+        web.uiDelegate = self
+        loadWeb()
     }
 
     private static func makeConnection(_ config: ViewerConfig) -> CSConnection {
@@ -38,16 +73,19 @@ final class ConsoleSession: ObservableObject, Identifiable {
 
     private func attach(_ c: CSConnection) {
         if let observer { NotificationCenter.default.removeObserver(observer) }
+        connection = c
         observer = NotificationCenter.default.addObserver(forName: .CSConnectionDidChange, object: c, queue: .main) {
             [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }
-        view.connection = c
+        applyPreferences()
+        spiceView?.connection = c
         c.connect()
         refresh()
     }
 
     private func refresh() {
+        guard let connection else { return }
         state = connection.state
         errorMessage = connection.errorMessage
         mouseMode = connection.mouseMode
@@ -56,15 +94,14 @@ final class ConsoleSession: ObservableObject, Identifiable {
 
     func applyPreferences() {
         let d = UserDefaults.standard
-        view.resizeGuestToFit = d.bool(forKey: Prefs.resizeGuest)
-        view.useRetinaResolution = d.bool(forKey: Prefs.retinaResolution)
-        connection.shareClipboard = d.bool(forKey: Prefs.shareClipboard)
+        spiceView?.resizeGuestToFit = d.bool(forKey: Prefs.resizeGuest)
+        spiceView?.useRetinaResolution = d.bool(forKey: Prefs.retinaResolution)
+        connection?.shareClipboard = d.bool(forKey: Prefs.shareClipboard)
     }
-
-    var canReconnect: Bool { state == .disconnected }
 
     func reconnect() {
         guard state == .disconnected else { return }
+        if isWeb { return loadWeb() }
         state = .connecting
         errorMessage = nil
         Task {
@@ -73,11 +110,9 @@ final class ConsoleSession: ObservableObject, Identifiable {
                 if let reconnectOptions {
                     config = try await reconnectOptions()
                 } else {
-                    config = ViewerConfig(options: connection.options)
+                    config = ViewerConfig(options: connection?.options ?? [:])
                 }
-                connection = Self.makeConnection(config)
-                applyPreferences()
-                attach(connection)
+                attach(Self.makeConnection(config))
             } catch {
                 state = .disconnected
                 errorMessage = error.localizedDescription
@@ -86,13 +121,85 @@ final class ConsoleSession: ObservableObject, Identifiable {
     }
 
     func disconnect() {
-        view.releasePointer()
-        connection.disconnect()
+        spiceView?.releasePointer()
+        connection?.disconnect()
+        webView?.loadHTMLString("", baseURL: nil)
     }
 
     func sendCtrlAltDel() {
-        connection.sendCtrlAltDel()
-        view.window?.makeFirstResponder(view)
+        guard let spiceView else { return }
+        connection?.sendCtrlAltDel()
+        spiceView.window?.makeFirstResponder(spiceView)
+    }
+
+    // MARK: Web console
+
+    private func loadWeb() {
+        guard let webView, let webReload else { return }
+        state = .connecting
+        errorMessage = nil
+        Task {
+            do {
+                let (url, cookie) = try await webReload()
+                if let cookie {
+                    await webView.configuration.websiteDataStore.httpCookieStore.setCookieAsync(cookie)
+                }
+                webView.load(URLRequest(url: url))
+            } catch {
+                state = .disconnected
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+}
+
+extension ConsoleSession: WKNavigationDelegate, WKUIDelegate {
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        state = .connected
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        webFailed(error)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        webFailed(error)
+    }
+
+    private func webFailed(_ error: Error) {
+        if (error as NSError).code == NSURLErrorCancelled { return }
+        state = .disconnected
+        errorMessage = error.localizedDescription
+    }
+
+    /// Proxmox' self-signed certificate: accept it only if the user pinned it.
+    func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge,
+                 completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let trust = challenge.protectionSpace.serverTrust else {
+            return completionHandler(.performDefaultHandling, nil)
+        }
+        if SecTrustEvaluateWithError(trust, nil) {
+            return completionHandler(.useCredential, URLCredential(trust: trust))
+        }
+        if let pinned = trustedHost, let fp = ProxmoxClient.fingerprint(of: trust),
+           TrustStore.isTrusted(fp, host: pinned.host, port: pinned.port) {
+            return completionHandler(.useCredential, URLCredential(trust: trust))
+        }
+        completionHandler(.cancelAuthenticationChallenge, nil)
+    }
+
+    /// The console page opens nothing else; links (e.g. docs) go to the browser.
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        if let url = navigationAction.request.url { NSWorkspace.shared.open(url) }
+        return nil
+    }
+}
+
+private extension WKHTTPCookieStore {
+    func setCookieAsync(_ cookie: HTTPCookie) async {
+        await withCheckedContinuation { cont in setCookie(cookie) { cont.resume() } }
     }
 }
 
@@ -116,11 +223,11 @@ struct DisplayViewHost: NSViewRepresentable {
     }
 
     func updateNSView(_ container: NSView, context: Context) {
-        if session.view.superview !== container { adopt(into: container) }
+        if session.displayView.superview !== container { adopt(into: container) }
     }
 
     private func adopt(into container: NSView) {
-        let v = session.view
+        let v = session.displayView
         v.removeFromSuperview()
         v.frame = container.bounds
         v.autoresizingMask = [.width, .height]
@@ -147,9 +254,11 @@ struct ConsoleView: View {
         }
         .toolbar {
             ToolbarItemGroup {
-                Button { session.sendCtrlAltDel() } label: { Label("Ctrl+Alt+Del", systemImage: "command.square") }
-                    .help("Send Ctrl+Alt+Del")
-                    .disabled(session.state != .connected)
+                if !session.isWeb {
+                    Button { session.sendCtrlAltDel() } label: { Label("Ctrl+Alt+Del", systemImage: "command.square") }
+                        .help("Send Ctrl+Alt+Del")
+                        .disabled(session.state != .connected)
+                }
                 if inMainWindow {
                     Button { model.detach(session) } label: { Label("Open in Window", systemImage: "macwindow.on.rectangle") }
                         .help("Open this console in a separate window")
@@ -203,7 +312,7 @@ struct ConsoleView: View {
                     .foregroundColor(.white)
                     .padding(.top, 10)
                     .transition(.opacity)
-            } else if session.mouseMode == .server {
+            } else if session.mouseMode == .server && !session.isWeb {
                 Text("Click inside to control the mouse")
                     .font(.caption)
                     .padding(.horizontal, 10).padding(.vertical, 4)
@@ -239,7 +348,7 @@ final class ConsoleWindowController: NSWindowController, NSWindowDelegate {
     init(session: ConsoleSession, model: AppModel) {
         self.session = session
         self.model = model
-        let size = session.connection.displaySize
+        let size = session.connection?.displaySize ?? .zero
         let initial = size.width > 0 ? NSSize(width: size.width, height: size.height) : NSSize(width: 1024, height: 768)
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: initial),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -265,6 +374,6 @@ final class ConsoleWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        session.view.releasePointer()
+        session.spiceView?.releasePointer()
     }
 }

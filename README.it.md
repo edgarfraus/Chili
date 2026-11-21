@@ -49,6 +49,10 @@ piccola interfaccia nativa che parla con Proxmox VE al posto tuo.
   laterale accanto ai server; ognuna si può spostare in una finestra propria (o a schermo intero) e
   riportare indietro. Display, tastiera, mouse, appunti e audio nativi di macOS, scritti direttamente su
   spice-glib: nessuna finestra GTK.
+- **Anche noVNC, container e shell dei nodi.** Le VM senza SPICE aprono in automatico la console noVNC di
+  Proxmox, i container LXC la sua console xterm.js, e il menu **Shell** nella barra apre una shell su
+  qualsiasi nodo, tutto nelle stesse schede. (Queste console web richiedono l'accesso con password, non un
+  token API.)
 - **Apre i file `.vv`**: quelli che scarica l'interfaccia web di Proxmox (*Console → SPICE*) o che
   producono oVirt e virt-manager si aprono con un doppio clic in una finestra con la sola console, senza
   il resto dell'app.
@@ -329,8 +333,6 @@ indica a GTK, GStreamer e gdk-pixbuf dove trovare i loro file dentro il bundle.
 
 - **Redirezione USB**, **smart card** e **condivisione cartelle** (WebDAV) non sono ancora incluse.
 - Gli accessi Proxmox solo WebAuthn/U2F non sono supportati: usa TOTP o un token API.
-- Le console VNC (container LXC, VM senza SPICE) non sono supportate: usa la console noVNC
-  dell'interfaccia web.
 - La finestra del visualizzatore è GTK, quindi ha un aspetto un po' diverso dalle app native per Mac.
 
 ## Licenza e riconoscimenti

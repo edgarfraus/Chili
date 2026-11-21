@@ -44,6 +44,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// Development aid: CHILI_DEBUG_SNAPSHOT=/dir makes the app save PNGs of its own
     /// windows every few seconds (no screen-recording permission needed for those).
     private func startDebugSnapshotsIfRequested() {
+        // CHILI_DEBUG_ACTION=novnc:<vmid> | spice:<vmid> | shell  — runs once the first server is logged in.
+        if let action = ProcessInfo.processInfo.environment["CHILI_DEBUG_ACTION"] {
+            Timer.scheduledTimer(withTimeInterval: 8, repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated { self?.runDebugAction(action) }
+            }
+        }
         guard let dir = ProcessInfo.processInfo.environment["CHILI_DEBUG_SNAPSHOT"] else { return }
         var n = 0
         Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
@@ -67,6 +73,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         model.disconnectAll()
+    }
+
+    private func runDebugAction(_ action: String) {
+        guard let profile = model.profiles.profiles.first else { return }
+        let session = model.session(for: profile)
+        let parts = action.split(separator: ":").map(String.init)
+        let vm = parts.count > 1 ? session.vms.first { String($0.vmid) == parts[1] } : nil
+        switch parts.first {
+        case "novnc": if let vm { session.openWebConsole(.vm(vm)) }
+        case "spice": if let vm { session.connect(vm) }
+        case "shell": if let node = session.vms.first?.node { session.openWebConsole(.nodeShell(node)) }
+        default: break
+        }
     }
 
     // MARK: Documents and URLs

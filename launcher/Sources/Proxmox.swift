@@ -25,6 +25,7 @@ struct ProxmoxVM: Identifiable, Hashable, Decodable {
     var displayName: String { name ?? "VM \(vmid)" }
     var isRunning: Bool { status == "running" }
     var isTemplate: Bool { (template ?? 0) == 1 }
+    var isContainer: Bool { type == "lxc" }
 }
 
 struct ProxmoxRealm: Identifiable, Hashable, Decodable {
@@ -167,11 +168,65 @@ final class ProxmoxClient: NSObject, URLSessionDelegate {
 
     func virtualMachines() async throws -> [ProxmoxVM] {
         let all: [ProxmoxVM] = try await request("GET", "/api2/json/cluster/resources?type=vm")
-        return all.filter { $0.type == "qemu" && !$0.isTemplate }.sorted { $0.vmid < $1.vmid }
+        return all.filter { ($0.type == "qemu" || $0.type == "lxc") && !$0.isTemplate }.sorted { $0.vmid < $1.vmid }
+    }
+
+    func nodes() async throws -> [String] {
+        struct Node: Decodable { let node: String; let status: String? }
+        let list: [Node] = try await request("GET", "/api2/json/nodes")
+        return list.filter { $0.status != "offline" }.map(\.node).sorted()
     }
 
     func start(_ vm: ProxmoxVM) async throws {
-        let _: String = try await request("POST", "/api2/json/nodes/\(vm.node)/qemu/\(vm.vmid)/status/start", form: [:])
+        let _: String = try await request("POST", "/api2/json/nodes/\(vm.node)/\(vm.type)/\(vm.vmid)/status/start", form: [:])
+    }
+
+    // MARK: Web consoles (noVNC / xterm.js served by Proxmox itself)
+
+    enum WebConsoleKind { case vm(ProxmoxVM), nodeShell(String) }
+
+    /// The web UI URL that opens Proxmox's own console page for a VM, container or node.
+    func webConsoleURL(_ kind: WebConsoleKind) throws -> URL {
+        var c = URLComponents(url: try baseURL(), resolvingAgainstBaseURL: false)!
+        c.path = "/"
+        switch kind {
+        case .vm(let vm) where vm.isContainer:
+            c.queryItems = [.init(name: "console", value: "lxc"), .init(name: "xtermjs", value: "1"),
+                            .init(name: "vmid", value: String(vm.vmid)), .init(name: "vmname", value: vm.name ?? ""),
+                            .init(name: "node", value: vm.node)]
+        case .vm(let vm):
+            c.queryItems = [.init(name: "console", value: "kvm"), .init(name: "novnc", value: "1"),
+                            .init(name: "vmid", value: String(vm.vmid)), .init(name: "vmname", value: vm.name ?? ""),
+                            .init(name: "node", value: vm.node), .init(name: "resize", value: "scale")]
+        case .nodeShell(let node):
+            c.queryItems = [.init(name: "console", value: "shell"), .init(name: "xtermjs", value: "1"),
+                            .init(name: "node", value: node)]
+        }
+        return c.url!
+    }
+
+    /// Cookie that logs the web console page in. Proxmox' web pages need a
+    /// password-based ticket; API tokens can't be used there.
+    func authCookie() -> HTTPCookie? {
+        guard case .ticket(let ticket, _) = auth else { return nil }
+        return HTTPCookie(properties: [
+            .name: "PVEAuthCookie",
+            .value: ticket.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ticket,
+            .domain: host.trimmingCharacters(in: CharacterSet(charactersIn: "[]")),
+            .path: "/",
+            .secure: "TRUE",
+        ])
+    }
+
+    var usesTicket: Bool {
+        if case .ticket = auth { return true }
+        return false
+    }
+
+    /// Tickets are valid for two hours; an existing ticket can be traded for a new one.
+    func renewTicket(username: String) async throws {
+        guard case .ticket(let ticket, _) = auth else { return }
+        try await login(username: username, password: ticket)
     }
 
     /// Asks Proxmox for a one-time SPICE ticket. The connection goes through the

@@ -47,6 +47,9 @@ that talks to Proxmox VE for you.
 - **Built-in console, all in one window.** Consoles open inside Chili, listed in the sidebar next to your
   servers; any of them can be moved to its own window (or full screen) and back. Native macOS display,
   keyboard, mouse, clipboard and audio, written directly on spice-glib — no GTK window involved.
+- **noVNC, containers and node shells too.** VMs without SPICE automatically open Proxmox' own noVNC
+  console, LXC containers its xterm.js console, and the toolbar's **Shell** menu opens a shell on any node —
+  all in the same tabs. (These web consoles need a password login, not an API token.)
 - **Opens `.vv` files.** The files that the Proxmox web UI downloads (*Console → SPICE*), or that oVirt
   and virt-manager produce, open with a double-click in a bare console window, without the rest of the app.
 - **Quick Connect** to any SPICE server by host and port, and `spice://` links.
@@ -310,7 +313,6 @@ environment that points GTK, GStreamer and gdk-pixbuf at the bundle.
 
 - **USB redirection**, **smart cards** and **folder sharing** (WebDAV) are not included yet.
 - WebAuthn/U2F-only Proxmox logins aren't supported; use TOTP or an API token.
-- VNC consoles (LXC containers, VMs without SPICE) aren't supported: use the noVNC console in the web UI.
 - The viewer window is GTK, so it looks slightly different from native Mac apps.
 
 ## License and credits

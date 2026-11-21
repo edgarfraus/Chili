@@ -78,6 +78,21 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Opens Proxmox' own web console (noVNC / xterm.js) inside Chili.
+    func openWebConsole(title: String, host: String, port: Int, placement: Placement? = nil,
+                        load: @escaping () async throws -> (URL, HTTPCookie?)) {
+        let session = ConsoleSession(webTitle: title, host: host, port: port, load: load)
+        consoles.append(session)
+        let where_ = placement ?? (UserDefaults.standard.string(forKey: Prefs.consolePlacement) == "window"
+                                   ? .window : .mainWindow)
+        if where_ == .mainWindow {
+            selection = .console(session.id)
+            showMainWindow?()
+        } else {
+            detach(session)
+        }
+    }
+
     func detach(_ session: ConsoleSession, fullScreen: Bool = false) {
         if session.window == nil {
             session.window = ConsoleWindowController(session: session, model: self)
@@ -275,7 +290,18 @@ final class ServerSession: ObservableObject {
                     try await client.start(vm)
                     try await waitUntilRunning(vm)
                 }
-                let config = try await client.spiceConfig(for: vm)
+                if vm.isContainer {
+                    openWebConsole(.vm(vm), placement: placement)
+                    return
+                }
+                let config: ViewerConfig
+                do {
+                    config = try await client.spiceConfig(for: vm)
+                } catch ProxmoxError.noSpice {
+                    // No SPICE display: fall back to Proxmox' noVNC console.
+                    openWebConsole(.vm(vm), placement: placement)
+                    return
+                }
                 let client = self.client
                 app?.openConsole(config: config, title: "\(vm.displayName) (\(vm.vmid))", placement: placement,
                                  reconnect: { try await client.spiceConfig(for: vm) })
@@ -283,6 +309,31 @@ final class ServerSession: ObservableObject {
                 app?.present(error)
             }
         }
+    }
+
+    /// noVNC for VMs, xterm.js for containers and node shells, served by Proxmox.
+    func openWebConsole(_ kind: ProxmoxClient.WebConsoleKind, placement: AppModel.Placement? = nil) {
+        guard client.usesTicket else {
+            app?.present(ProxmoxError.http(0, NSLocalizedString(
+                "The noVNC and shell consoles need a password login: Proxmox' web pages can't use API tokens.",
+                comment: "")))
+            return
+        }
+        let title: String
+        switch kind {
+        case .vm(let vm): title = "\(vm.displayName) (\(vm.vmid))"
+        case .nodeShell(let node): title = String(format: NSLocalizedString("Shell – %@", comment: ""), node)
+        }
+        let client = self.client
+        let username = profile.fullUsername
+        app?.openWebConsole(title: title, host: client.host, port: client.port, placement: placement) {
+            try? await client.renewTicket(username: username)
+            return (try client.webConsoleURL(kind), client.authCookie())
+        }
+    }
+
+    func loadNodes() async -> [String] {
+        (try? await client.nodes()) ?? Array(Set(vms.map(\.node))).sorted()
     }
 
     func start(_ vm: ProxmoxVM) {
