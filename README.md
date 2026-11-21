@@ -129,7 +129,7 @@ password. Recovery keys work too. WebAuthn/YubiKey-only accounts are not support
 
 ### 3. Connect
 
-The list shows every VM in the cluster, with its node, vCPUs and memory, and refreshes every 5 seconds. Running VMs show live CPU (with a 5-minute graph), memory and network usage.
+The list shows every VM in the cluster, with its node, vCPUs and memory, and refreshes every 5 seconds. Running VMs show live CPU and memory dials and network traffic.
 
 - Double-click a VM, or click **Connect**.
 - For a stopped VM, **Start & Connect** boots it and opens the console as soon as it is up.

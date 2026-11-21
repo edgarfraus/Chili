@@ -289,7 +289,7 @@ private struct VMRow: View {
 
 // MARK: - Resource monitor
 
-/// CPU sparkline, memory bar and network rate for one running VM.
+/// CPU and memory dials plus network rate for one running VM.
 private struct UsageView: View {
     let vm: ProxmoxVM
     let samples: [UsageSample]
@@ -300,25 +300,11 @@ private struct UsageView: View {
     }
 
     var body: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: "CPU \(Int((cpu * 100).rounded()))%")
-                    .font(.caption2.monospacedDigit()).foregroundColor(.secondary)
-                Sparkline(values: samples.map(\.cpu))
-                    .stroke(Self.color(for: cpu), lineWidth: 1.5)
-                    .background(Sparkline(values: samples.map(\.cpu), closed: true)
-                        .fill(Self.color(for: cpu).opacity(0.15)))
-                    .frame(width: 80, height: 18)
-            }
-            .help(Text("CPU usage over the last 5 minutes"))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(verbatim: "RAM \(Self.bytes(vm.mem)) / \(Self.bytes(vm.maxmem))")
-                    .font(.caption2.monospacedDigit()).foregroundColor(.secondary)
-                Meter(value: memory, color: Self.color(for: memory))
-                    .frame(width: 110, height: 6)
-            }
-
+        HStack(spacing: 12) {
+            Dial(value: cpu, label: "CPU", color: Self.color(for: cpu))
+                .help(Text(verbatim: "CPU \(Int((cpu * 100).rounded()))% · \(Int(vm.maxcpu ?? 0)) vCPU"))
+            Dial(value: memory, label: "RAM", color: Self.color(for: memory))
+                .help(Text(verbatim: "RAM \(Self.bytes(vm.mem)) / \(Self.bytes(vm.maxmem))"))
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: "↓ \(Self.rate(samples.last?.netIn))")
                 Text(verbatim: "↑ \(Self.rate(samples.last?.netOut))")
@@ -343,41 +329,73 @@ private struct UsageView: View {
     }
 }
 
-private struct Sparkline: Shape {
-    let values: [Double]
-    var closed = false
-
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        guard values.count > 1 else {
-            p.move(to: CGPoint(x: rect.minX, y: rect.maxY))
-            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-            return p
-        }
-        let step = rect.width / CGFloat(values.count - 1)
-        for (i, v) in values.enumerated() {
-            let pt = CGPoint(x: rect.minX + CGFloat(i) * step, y: rect.maxY - CGFloat(v) * rect.height)
-            i == 0 ? p.move(to: pt) : p.addLine(to: pt)
-        }
-        if closed {
-            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-            p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-            p.closeSubpath()
-        }
-        return p
-    }
-}
-
-private struct Meter: View {
-    let value: Double
+/// A small tachometer: 240° scale, coloured arc up to the value and a needle.
+private struct Dial: View {
+    let value: Double          // 0…1
+    let label: String
     let color: Color
 
+    private static let sweep = 240.0
+    private static let start = 150.0   // degrees, 0 = 3 o'clock, clockwise
+
     var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color.secondary.opacity(0.2))
-                Capsule().fill(color).frame(width: max(geo.size.width * CGFloat(value), value > 0 ? 3 : 0))
+        let v = min(max(value, 0), 1)
+        ZStack {
+            Arc(from: 0, to: 1).stroke(Color.secondary.opacity(0.2), style: StrokeStyle(lineWidth: 4, lineCap: .round))
+            Arc(from: 0, to: v).stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+            ForEach(0..<5) { i in
+                Tick(fraction: Double(i) / 4).stroke(Color.secondary.opacity(0.5), lineWidth: 1)
             }
+            Needle(fraction: v).stroke(Color.primary.opacity(0.8), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            Circle().fill(Color.primary.opacity(0.8)).frame(width: 4, height: 4)
+            Text(verbatim: "\(Int((v * 100).rounded()))%")
+                .font(.system(size: 8, weight: .semibold).monospacedDigit())
+                .offset(y: 15)
+        }
+        .frame(width: 42, height: 42)
+        .overlay(Text(verbatim: label).font(.system(size: 8)).foregroundColor(.secondary).offset(y: 27))
+        .padding(.bottom, 10)
+        .animation(.easeOut(duration: 0.6), value: v)
+    }
+
+    static func angle(_ fraction: Double) -> Angle { .degrees(start + sweep * fraction) }
+
+    struct Arc: Shape {
+        var from: Double, to: Double
+        var animatableData: AnimatablePair<Double, Double> {
+            get { AnimatablePair(from, to) }
+            set { from = newValue.first; to = newValue.second }
+        }
+        func path(in rect: CGRect) -> Path {
+            var p = Path()
+            p.addArc(center: CGPoint(x: rect.midX, y: rect.midY), radius: rect.width / 2 - 3,
+                     startAngle: Dial.angle(from), endAngle: Dial.angle(to), clockwise: false)
+            return p
+        }
+    }
+
+    struct Needle: Shape {
+        var fraction: Double
+        var animatableData: Double { get { fraction } set { fraction = newValue } }
+        func path(in rect: CGRect) -> Path {
+            let c = CGPoint(x: rect.midX, y: rect.midY)
+            let a = Dial.angle(fraction).radians, r = rect.width / 2 - 9
+            var p = Path()
+            p.move(to: c)
+            p.addLine(to: CGPoint(x: c.x + CGFloat(cos(a)) * r, y: c.y + CGFloat(sin(a)) * r))
+            return p
+        }
+    }
+
+    struct Tick: Shape {
+        let fraction: Double
+        func path(in rect: CGRect) -> Path {
+            let c = CGPoint(x: rect.midX, y: rect.midY)
+            let a = Dial.angle(fraction).radians, r1 = rect.width / 2 - 7, r2 = rect.width / 2 - 9.5
+            var p = Path()
+            p.move(to: CGPoint(x: c.x + CGFloat(cos(a)) * r1, y: c.y + CGFloat(sin(a)) * r1))
+            p.addLine(to: CGPoint(x: c.x + CGFloat(cos(a)) * r2, y: c.y + CGFloat(sin(a)) * r2))
+            return p
         }
     }
 }

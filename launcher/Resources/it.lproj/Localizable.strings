@@ -114,6 +114,5 @@
 "Choose a .vv connection file (for example one downloaded from Proxmox)" = "Scegli un file di connessione .vv (per esempio uno scaricato da Proxmox)";
 
 /* Resource monitor */
-"CPU usage over the last 5 minutes" = "Uso della CPU negli ultimi 5 minuti";
 "Network traffic" = "Traffico di rete";
 "“%@” is not a valid host name or IP address." = "“%@” non è un nome host o un indirizzo IP valido.";

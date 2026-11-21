@@ -138,7 +138,7 @@ WebAuthn/YubiKey non sono supportati: usa un token API.
 
 ### 3. Connettiti
 
-L'elenco mostra tutte le VM del cluster, con nodo, vCPU e memoria, e si aggiorna ogni 5 secondi. Per le VM accese mostra in tempo reale CPU (con il grafico degli ultimi 5 minuti), memoria e traffico di rete.
+L'elenco mostra tutte le VM del cluster, con nodo, vCPU e memoria, e si aggiorna ogni 5 secondi. Per le VM accese mostra in tempo reale due contagiri per CPU e memoria e il traffico di rete.
 
 - Fai doppio clic su una VM, oppure clic su **Connetti**.
 - Per una VM spenta, **Avvia e connetti** la accende e apre la console appena è pronta.
