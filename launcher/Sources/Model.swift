@@ -120,9 +120,15 @@ final class AppModel: ObservableObject {
             controller.window?.delegate = nil
             controller.close()
         }
-        consoles.removeAll { $0 === session }
-        if selection == .console(session.id) { selection = consoles.last.map { .console($0.id) } ?? .quickConnect }
-        NotificationCenter.default.post(name: .consolesChanged, object: nil)
+        // Move the selection away first and drop the console on the next turn:
+        // changing both in one update left NavigationView with an empty detail pane.
+        if selection == .console(session.id) {
+            selection = consoles.last(where: { $0 !== session }).map { .console($0.id) } ?? .quickConnect
+        }
+        DispatchQueue.main.async {
+            self.consoles.removeAll { $0 === session }
+            NotificationCenter.default.post(name: .consolesChanged, object: nil)
+        }
     }
 
     func consoleWindowClosed(_ controller: ConsoleWindowController) {
@@ -194,6 +200,8 @@ final class ServerSession: ObservableObject {
     var api: ProxmoxClient { client }
 
     func connectWithStoredSecret() {
+        // Dev aid: UI tests without touching the Keychain or the server.
+        if ProcessInfo.processInfo.environment["CHILI_DEBUG_NO_LOGIN"] != nil { return }
         guard state == .loggedOut, let secret = storedSecret else { return }
         login(secret: secret)
     }

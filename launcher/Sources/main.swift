@@ -78,11 +78,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private var debugWindows: [NSWindow] = []
 
+    private func dumpMainWindow() {
+        func dump(_ v: NSView, _ depth: Int) {
+            guard depth < 16 else { return }
+            DebugActions.log(String(repeating: "  ", count: depth) + "\(type(of: v)) \(v.frame)")
+            for s in v.subviews { dump(s, depth + 1) }
+        }
+        DebugActions.log("window frame \(mainWindow?.frame ?? .zero)")
+        if let root = mainWindow?.contentView { dump(root, 0) }
+    }
+
     private func runDebugAction(_ action: String) {
         if action.hasPrefix("wizard") {   // layout preview, no server needed
             let custom = action.contains("custom")
             let os: VMDraft.OS = action.contains("win") ? .win11 : .linux
             debugWindows.append(DebugActions.previewWizard(app: model, recommended: !custom, os: os))
+            return
+        }
+        if action == "dump" { dumpMainWindow(); return }
+        if action == "quickdump" {
+            model.selection = .quickConnect
+            Timer.scheduledTimer(withTimeInterval: 3, repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated { self?.dumpMainWindow() }
+            }
+            return
+        }
+        if action == "opentest" {
+            var config = ViewerConfig()
+            config["host"] = "127.0.0.1"
+            config["port"] = "5912"
+            model.openConsole(config: config, title: "test", placement: .mainWindow)
+            Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated { self?.dumpMainWindow() }
+            }
+            return
+        }
+        if action == "closetest" {   // open a console on the local test server, then close it
+            var config = ViewerConfig()
+            config["host"] = "127.0.0.1"
+            config["port"] = "5912"
+            model.openConsole(config: config, title: "test", placement: .mainWindow)
+            Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    if let c = self?.model.consoles.first { self?.model.close(c) }
+                    Timer.scheduledTimer(withTimeInterval: 3, repeats: false) { _ in
+                        MainActor.assumeIsolated {
+                            func dump(_ v: NSView, _ depth: Int) {
+                                guard depth < 14 else { return }
+                                DebugActions.log(String(repeating: "  ", count: depth) + "\(type(of: v)) \(v.frame) hidden=\(v.isHidden) alpha=\(v.alphaValue)")
+                                for s in v.subviews { dump(s, depth + 1) }
+                            }
+                            if let root = self?.mainWindow?.contentView { dump(root, 0) }
+                        }
+                    }
+                }
+            }
             return
         }
         guard let profile = model.profiles.profiles.first else { return }

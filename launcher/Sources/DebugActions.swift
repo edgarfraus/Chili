@@ -5,7 +5,7 @@ import SwiftUI
 /// Exercises the VM wizard code against a real server and logs to stderr.
 @MainActor
 enum DebugActions {
-    static func log(_ s: String) {
+    nonisolated static func log(_ s: String) {
         FileHandle.standardError.write(Data("[debug] \(s)\n".utf8))
     }
 

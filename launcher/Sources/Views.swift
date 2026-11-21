@@ -12,8 +12,9 @@ struct ContentView: View {
         NavigationView {
             Sidebar()
             DetailView()
+                .id(model.selection)   // rebuild the pane on every selection change
         }
-        .frame(minWidth: 820, minHeight: 480)
+        .frame(minWidth: 820, maxWidth: .infinity, minHeight: 480, maxHeight: .infinity)
         .sheet(item: $model.editingProfile) { profile in
             ServerEditor(profile: profile)
         }
@@ -616,15 +617,26 @@ struct QuickConnectView: View {
                 Text("Quick Connect").font(.title2.bold())
                 Text("Connect directly to a SPICE server, for example a QEMU or libvirt VM started with -spice port=5900.")
                     .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(3)
             }
-            Form {
-                TextField("Host", text: $host, prompt: Text(verbatim: "192.168.1.10"))
-                TextField("Port", value: $port, formatter: NumberFormatter())
-                Toggle("Use TLS (port is the TLS port)", isOn: $tls)
-                SecureField("Password", text: $password, prompt: Text("optional"))
+            // Explicit rows: a SwiftUI Form here inflated the whole window's content.
+            VStack(alignment: .leading, spacing: 10) {
+                field("Host") {
+                    TextField("", text: $host, prompt: Text(verbatim: "192.168.1.10"))
+                        .textFieldStyle(.roundedBorder)
+                }
+                field("Port") {
+                    TextField("", value: $port, formatter: NumberFormatter())
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 90)
+                }
+                field(nil) { Toggle("Use TLS (port is the TLS port)", isOn: $tls) }
+                field("Password") {
+                    SecureField("", text: $password, prompt: Text("optional"))
+                        .textFieldStyle(.roundedBorder)
+                }
             }
-            .frame(maxWidth: 420)
+            .frame(maxWidth: 460, alignment: .leading)
             HStack {
                 Button("Connect", action: connect)
                     .keyboardShortcut(.defaultAction)
@@ -636,14 +648,21 @@ struct QuickConnectView: View {
                 Text("Using Proxmox?").font(.headline)
                 Text("Add your server in the sidebar to list its VMs and connect with one click. You can also open the .vv files that Proxmox downloads when you choose Console → SPICE.")
                     .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(4)
                 Button("Add Proxmox Server…") { model.editingProfile = ServerProfile() }
             }
-            Spacer()
         }
         .padding(28)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .navigationTitle("Quick Connect")
+    }
+
+    private func field<Content: View>(_ label: LocalizedStringKey?, @ViewBuilder _ content: () -> Content) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Group { if let label { Text(label) } else { Text(verbatim: "") } }
+                .frame(width: 80, alignment: .trailing)
+            content()
+        }
     }
 
     private func connect() {

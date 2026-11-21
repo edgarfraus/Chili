@@ -216,8 +216,18 @@ extension ViewerConfig {
 struct DisplayViewHost: NSViewRepresentable {
     let session: ConsoleSession
 
+    /// A container with no size of its own, so SwiftUI sizes it to the pane
+    /// (otherwise the display could inflate the whole window's content).
+    final class FlexibleContainer: NSView {
+        override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric) }
+    }
+
     func makeNSView(context: Context) -> NSView {
-        let container = NSView()
+        let container = FlexibleContainer()
+        for orientation in [NSLayoutConstraint.Orientation.horizontal, .vertical] {
+            container.setContentHuggingPriority(.init(1), for: orientation)
+            container.setContentCompressionResistancePriority(.init(1), for: orientation)
+        }
         adopt(into: container)
         return container
     }
@@ -276,6 +286,7 @@ struct ConsoleView: View {
                     .help("Disconnect and close this console")
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(Text(verbatim: session.title))
     }
 

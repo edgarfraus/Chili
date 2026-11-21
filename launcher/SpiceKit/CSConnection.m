@@ -124,7 +124,8 @@ static void cs_teardown(SpiceSession *session, SpiceAudio *audio, GPtrArray *cha
     cs_spice_async(^{
         if (session) spice_session_disconnect(session);
         if (channels) g_ptr_array_unref(channels);
-        if (audio) g_object_unref(audio);
+        // spice_audio_get() is (transfer none): the session owns the SpiceAudio.
+        (void)audio;
         if (session) g_object_unref(session);
     });
 }
