@@ -138,6 +138,7 @@ private struct Placeholder: View {
 struct ServerDetailView: View {
     @EnvironmentObject var model: AppModel
     @ObservedObject var session: ServerSession
+    @State private var showWizard = false
 
     var body: some View {
         Group {
@@ -155,6 +156,8 @@ struct ServerDetailView: View {
         .toolbar {
             ToolbarItemGroup {
                 if session.state == .ready {
+                    Button { showWizard = true } label: { Label("New VM", systemImage: "plus.rectangle.on.rectangle") }
+                        .help("Create a new virtual machine")
                     NodeShellMenu(session: session)
                     Button { session.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
                         .help("Refresh the VM list")
@@ -166,6 +169,7 @@ struct ServerDetailView: View {
             }
         }
         .onAppear { session.connectWithStoredSecret() }
+        .sheet(isPresented: $showWizard) { VMWizardView(session: session) }
         .alert(item: Binding(get: { session.pendingCertificate.map { CertPrompt(fingerprint: $0) } },
                              set: { if $0 == nil { session.pendingCertificate = nil } })) { prompt in
             Alert(title: Text("Untrusted certificate"),
@@ -305,6 +309,9 @@ private struct VMRow: View {
     let busy: Bool
     let session: ServerSession
 
+    private enum Confirm: Identifiable { case stop, delete; var id: Int { self == .stop ? 0 : 1 } }
+    @State private var confirm: Confirm?
+
     private func connect() { session.connect(vm) }
     private func start() { session.start(vm) }
 
@@ -337,10 +344,19 @@ private struct VMRow: View {
                 Menu {
                     Button("Open in Separate Window") { session.connect(vm, placement: .window) }
                     if !vm.isContainer {
-                        Divider()
                         Button("noVNC Console") { session.openWebConsole(.vm(vm), placement: .mainWindow) }
                         Button("noVNC Console in Separate Window") { session.openWebConsole(.vm(vm), placement: .window) }
                     }
+                    Divider()
+                    if vm.isRunning {
+                        Button("Shut Down") { session.power(vm, .shutdown) }
+                        Button("Reboot") { session.power(vm, .reboot) }
+                        Button("Stop (power off)") { confirm = .stop }
+                    } else {
+                        Button("Start") { start() }
+                    }
+                    Divider()
+                    Button("Delete…") { confirm = .delete }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -352,6 +368,20 @@ private struct VMRow: View {
         .padding(.vertical, 4)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { if !busy { connect() } }
+        .alert(item: $confirm) { which in
+            switch which {
+            case .stop:
+                return Alert(title: Text("Stop \(vm.displayName)?"),
+                             message: Text("This powers the VM off immediately, like pulling the plug. Unsaved data in the VM is lost."),
+                             primaryButton: .destructive(Text("Stop")) { session.power(vm, .stop) },
+                             secondaryButton: .cancel())
+            case .delete:
+                return Alert(title: Text("Delete \(vm.displayName) (\(String(vm.vmid)))?"),
+                             message: Text("The VM and all its disks are permanently deleted from Proxmox. This can't be undone."),
+                             primaryButton: .destructive(Text("Delete")) { session.delete(vm) },
+                             secondaryButton: .cancel())
+            }
+        }
     }
 
     private var details: String {

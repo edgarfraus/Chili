@@ -80,7 +80,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let session = model.session(for: profile)
         let parts = action.split(separator: ":").map(String.init)
         let vm = parts.count > 1 ? session.vms.first { String($0.vmid) == parts[1] } : nil
+        func whenReady(_ work: @escaping () async -> Void) {
+            Task {
+                for _ in 0..<60 where session.state != .ready { try? await Task.sleep(nanoseconds: 500_000_000) }
+                await work()
+                DebugActions.log("done")
+            }
+        }
         switch parts.first {
+        case "inventory": whenReady { await DebugActions.inventory(session) }
+        case "create": whenReady { await DebugActions.createTest(session, variant: parts.count > 1 ? parts[1] : "linux",
+                                                                  keep: parts.contains("keep")) }
+        case "cleanup": whenReady { await DebugActions.cleanup(session) }
+        case "tasklog": whenReady {
+            if let vm = session.vms.first(where: { String($0.vmid) == parts[1] }) {
+                do { for l in try await session.api.lastTaskLog(vm) { DebugActions.log("task: \(l)") } }
+                catch { DebugActions.log("tasklog failed: \(error.localizedDescription)") }
+            }
+        }
         case "novnc": if let vm { session.openWebConsole(.vm(vm)) }
         case "spice": if let vm { session.connect(vm) }
         case "shell": if let node = session.vms.first?.node { session.openWebConsole(.nodeShell(node)) }

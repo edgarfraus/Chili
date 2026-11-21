@@ -137,6 +137,9 @@ final class AppModel: ObservableObject {
 
     func present(_ error: Error?) {
         guard let error else { return }
+        if ProcessInfo.processInfo.environment["CHILI_DEBUG_ACTION"] != nil {
+            DebugActions.log("alert: \(error.localizedDescription)")
+        }
         alert = AlertInfo(title: NSLocalizedString("Something went wrong", comment: ""),
                           message: error.localizedDescription)
     }
@@ -187,6 +190,8 @@ final class ServerSession: ObservableObject {
     }
 
     var storedSecret: String? { Keychain.load(account: profile.id.uuidString) }
+    /// For the VM wizard and VM actions.
+    var api: ProxmoxClient { client }
 
     func connectWithStoredSecret() {
         guard state == .loggedOut, let secret = storedSecret else { return }
@@ -287,8 +292,7 @@ final class ServerSession: ObservableObject {
             defer { busyVM = nil }
             do {
                 if !vm.isRunning {
-                    try await client.start(vm)
-                    try await waitUntilRunning(vm)
+                    try await startAndWait(vm)
                 }
                 if vm.isContainer {
                     openWebConsole(.vm(vm), placement: placement)
@@ -336,17 +340,57 @@ final class ServerSession: ObservableObject {
         (try? await client.nodes()) ?? Array(Set(vms.map(\.node))).sorted()
     }
 
+    /// Shutdown, reboot, stop… then refresh the list.
+    func power(_ vm: ProxmoxVM, _ action: ProxmoxClient.PowerAction) {
+        busyVM = vm.id
+        Task {
+            defer { busyVM = nil }
+            do {
+                let upid = try await client.power(vm, action)
+                try await client.waitForTask(node: vm.node, upid: upid, timeout: 180)
+                try await reload()
+            } catch {
+                app?.present(error)
+            }
+        }
+    }
+
+    /// Deletes a VM or container with its disks (it must be stopped).
+    func delete(_ vm: ProxmoxVM) {
+        busyVM = vm.id
+        Task {
+            defer { busyVM = nil }
+            do {
+                if vm.isRunning {
+                    let stop = try await client.power(vm, .stop)
+                    try await client.waitForTask(node: vm.node, upid: stop, timeout: 120)
+                }
+                let upid = try await client.delete(vm)
+                try await client.waitForTask(node: vm.node, upid: upid)
+                try await reload()
+            } catch {
+                app?.present(error)
+            }
+        }
+    }
+
     func start(_ vm: ProxmoxVM) {
         busyVM = vm.id
         Task {
             defer { busyVM = nil }
             do {
-                try await client.start(vm)
-                try await waitUntilRunning(vm)
+                try await startAndWait(vm)
             } catch {
                 app?.present(error)
             }
         }
+    }
+
+    /// Starts the VM and waits for Proxmox' start task, so its real error (if any) is shown.
+    private func startAndWait(_ vm: ProxmoxVM) async throws {
+        let upid = try await client.power(vm, .start)
+        try await client.waitForTask(node: vm.node, upid: upid, timeout: 120)
+        try await waitUntilRunning(vm)
     }
 
     private func waitUntilRunning(_ vm: ProxmoxVM) async throws {

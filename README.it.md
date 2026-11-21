@@ -53,6 +53,10 @@ piccola interfaccia nativa che parla con Proxmox VE al posto tuo.
   Proxmox, i container LXC la sua console xterm.js, e il menu **Shell** nella barra apre una shell su
   qualsiasi nodo, tutto nelle stesse schede. (Queste console web richiedono l'accesso con password, non un
   token API.)
+- **Crea e gestisci le VM senza l'interfaccia web.** Un assistente *Nuova VM* con due modalità,
+  *Consigliata per Chili* (solo l'essenziale, il resto impostato per la migliore esperienza in console) e
+  *Personalizzata* (tutte le opzioni, come in Proxmox), più arresta, riavvia, ferma ed elimina dal menu
+  di ogni VM.
 - **Apre i file `.vv`**: quelli che scarica l'interfaccia web di Proxmox (*Console → SPICE*) o che
   producono oVirt e virt-manager si aprono con un doppio clic in una finestra con la sola console, senza
   il resto dell'app.
@@ -155,6 +159,24 @@ L'elenco mostra tutte le VM del cluster, con nodo, vCPU e memoria, e si aggiorna
 - Per una VM spenta, **Avvia e connetti** la accende e apre la console appena è pronta.
 - Usa il campo di ricerca per filtrare per nome o ID della VM.
 
+### Creare una VM
+
+Fai clic su **Nuova VM** nella barra del server.
+
+- **Consigliata per Chili**: scegli nodo, nome, sistema operativo, ISO di installazione, core, memoria,
+  disco e rete. Il resto lo imposta Chili: display e audio SPICE, agente guest QEMU, macchina q35, disco
+  VirtIO SCSI con discard e IO thread, rete VirtIO; per Windows 11 anche UEFI con Secure Boot e TPM 2.0.
+  Per Windows scegli anche l'ISO dei driver `virtio-win.iso` (Chili la monta come secondo CD); senza,
+  Chili usa disco SATA e scheda di rete Intel, che l'installazione di Windows riconosce da sola.
+- **Personalizzata**: tutte le opzioni dell'assistente di Proxmox (ID, BIOS, macchina, controller SCSI,
+  bus del disco, cache, socket e tipo di CPU, ballooning, VLAN, tipo di display, monitor…).
+- Il tipo di CPU predefinito è `x86-64-v2` (o `host` sulle CPU molto vecchie): quello predefinito di
+  Proxmox, `x86-64-v2-AES`, non parte sugli host senza AES-NI.
+- Con **Avvia la VM e apri la console** spuntato, la nuova VM parte e si apre subito in una scheda.
+
+Il menu **…** di ogni VM ha anche **Arresta**, **Riavvia**, **Ferma** ed **Elimina** (entrambe chiedono
+conferma).
+
 ### Usare un token API invece della password (consigliato)
 
 Un token API si può revocare in qualsiasi momento, funziona anche con gli account protetti da 2FA e si
@@ -246,6 +268,7 @@ visualizzatore** e riproduci il problema.
 | Di nuovo l'avviso sul certificato dopo un aggiornamento di Proxmox | Il certificato è cambiato: confronta la nuova impronta e poi consideralo attendibile. **Impostazioni → Dimentica i certificati attendibili** li azzera tutti. |
 | Niente ridimensionamento, niente appunti | Installa `spice-guest-tools` (Windows) o `spice-vdagent` (Linux) nell'ospite. |
 | Niente audio | Aggiungi alla VM un *Audio Device* con driver **SPICE**. |
+| macOS chiede di consentire l'accesso al Portachiavi | Fai clic su **Consenti sempre**. Senza la firma Apple Developer ID, macOS lo richiede una volta dopo ogni aggiornamento dell'app. |
 | L'app "è danneggiata e non può essere aperta" | È stata scaricata con la quarantena e non è notarizzata: vedi [Primo avvio](#primo-avvio). |
 
 ## Privacy e sicurezza

@@ -181,6 +181,132 @@ final class ProxmoxClient: NSObject, URLSessionDelegate {
         let _: String = try await request("POST", "/api2/json/nodes/\(vm.node)/\(vm.type)/\(vm.vmid)/status/start", form: [:])
     }
 
+    // MARK: Inventory for the VM wizard
+
+    struct Storage: Decodable, Hashable, Identifiable {
+        let storage: String
+        let type: String?
+        let content: String?
+        let avail: Int64?
+        let total: Int64?
+        let active: Int?
+        var id: String { storage }
+    }
+
+    struct StorageItem: Decodable, Hashable, Identifiable {
+        let volid: String
+        let size: Int64?
+        var id: String { volid }
+        var fileName: String { volid.split(separator: "/").last.map(String.init) ?? volid }
+    }
+
+    struct NetworkInterface: Decodable, Hashable, Identifiable {
+        let iface: String
+        let type: String?
+        let active: Int?
+        let comments: String?
+        var id: String { iface }
+    }
+
+    struct NodeStatus: Decodable {
+        struct CPUInfo: Decodable { let cpus: Int?; let model: String?; let flags: String? }
+        struct Memory: Decodable { let total: Int64?; let free: Int64? }
+        let cpuinfo: CPUInfo?
+        let memory: Memory?
+    }
+
+    func nextVMID() async throws -> Int {
+        // Returned as a string ("102") by most versions, as a number by some.
+        let data = try await raw("GET", "/api2/json/cluster/nextid")
+        if let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let s = obj["data"] as? String, let n = Int(s) { return n }
+            if let n = obj["data"] as? Int { return n }
+        }
+        throw ProxmoxError.badResponse
+    }
+
+    /// Storages of a node that accept `content` (images, iso, rootdir, vztmpl).
+    func storages(node: String, content: String) async throws -> [Storage] {
+        let list: [Storage] = try await request("GET", "/api2/json/nodes/\(node)/storage?content=\(content)&enabled=1")
+        return list.filter { ($0.active ?? 1) == 1 }.sorted { $0.storage < $1.storage }
+    }
+
+    func isoImages(node: String, storage: String) async throws -> [StorageItem] {
+        let list: [StorageItem] = try await request("GET", "/api2/json/nodes/\(node)/storage/\(storage)/content?content=iso")
+        return list.sorted { $0.fileName.localizedCaseInsensitiveCompare($1.fileName) == .orderedAscending }
+    }
+
+    func bridges(node: String) async throws -> [NetworkInterface] {
+        let list: [NetworkInterface] = try await request("GET", "/api2/json/nodes/\(node)/network?type=any_bridge")
+        return list.sorted { $0.iface < $1.iface }
+    }
+
+    func nodeStatus(node: String) async throws -> NodeStatus {
+        try await request("GET", "/api2/json/nodes/\(node)/status")
+    }
+
+    // MARK: Creating and managing VMs
+
+    /// A VM's configuration as strings (for display and checks).
+    func vmConfig(_ vm: ProxmoxVM) async throws -> [String: String] {
+        let data = try await raw("GET", "/api2/json/nodes/\(vm.node)/\(vm.type)/\(vm.vmid)/config")
+        guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let config = obj["data"] as? [String: Any] else { throw ProxmoxError.badResponse }
+        return config.mapValues { "\($0)" }
+    }
+
+    /// Creates a QEMU VM; returns the task id (UPID).
+    func createVM(node: String, parameters: [String: String]) async throws -> String {
+        try await request("POST", "/api2/json/nodes/\(node)/qemu", form: parameters)
+    }
+
+    enum PowerAction: String { case start, shutdown, reboot, stop, reset, suspend, resume }
+
+    @discardableResult
+    func power(_ vm: ProxmoxVM, _ action: PowerAction) async throws -> String {
+        try await request("POST", "/api2/json/nodes/\(vm.node)/\(vm.type)/\(vm.vmid)/status/\(action.rawValue)", form: [:])
+    }
+
+    /// Deletes a stopped VM or container together with its disks.
+    @discardableResult
+    func delete(_ vm: ProxmoxVM) async throws -> String {
+        try await request("DELETE", "/api2/json/nodes/\(vm.node)/\(vm.type)/\(vm.vmid)?purge=1&destroy-unreferenced-disks=1")
+    }
+
+    /// Log of the most recent task for a VM (for diagnostics).
+    func lastTaskLog(_ vm: ProxmoxVM) async throws -> [String] {
+        struct TaskEntry: Decodable { let upid: String }
+        struct Line: Decodable { let t: String }
+        let tasks: [TaskEntry] = try await request("GET", "/api2/json/nodes/\(vm.node)/tasks?vmid=\(vm.vmid)&limit=1")
+        guard let upid = tasks.first?.upid else { return [] }
+        let escaped = upid.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? upid
+        let lines: [Line] = try await request("GET", "/api2/json/nodes/\(vm.node)/tasks/\(escaped)/log?limit=500")
+        return lines.map(\.t)
+    }
+
+    struct TaskStatus: Decodable {
+        let status: String          // "running" / "stopped"
+        let exitstatus: String?     // "OK" or the error
+    }
+
+    /// Waits for a Proxmox task; throws with the task's last log lines if it failed.
+    func waitForTask(node: String, upid: String, timeout: TimeInterval = 600) async throws {
+        let escaped = upid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: ":@"))) ?? upid
+        let start = Date()
+        while Date().timeIntervalSince(start) < timeout {
+            let st: TaskStatus = try await request("GET", "/api2/json/nodes/\(node)/tasks/\(escaped)/status")
+            if st.status == "stopped" {
+                if st.exitstatus == "OK" { return }
+                struct Line: Decodable { let t: String }
+                let log: [Line] = (try? await request("GET", "/api2/json/nodes/\(node)/tasks/\(escaped)/log?limit=500")) ?? []
+                let tail = log.suffix(6).map(\.t).joined(separator: "\n")
+                throw ProxmoxError.http(0, [st.exitstatus ?? "", tail].filter { !$0.isEmpty }.joined(separator: "\n\n"))
+            }
+            try await Task.sleep(nanoseconds: 700_000_000)
+        }
+        throw ProxmoxError.http(0, NSLocalizedString("The task is taking too long; check it in Proxmox.", comment: ""))
+    }
+
     // MARK: Web consoles (noVNC / xterm.js served by Proxmox itself)
 
     enum WebConsoleKind { case vm(ProxmoxVM), nodeShell(String) }
@@ -272,10 +398,13 @@ final class ProxmoxClient: NSObject, URLSessionDelegate {
         var req = URLRequest(url: url)
         req.httpMethod = method
         if let form {
-            var c = URLComponents()
-            c.queryItems = form.map { URLQueryItem(name: $0.key, value: $0.value) }
-            // URLComponents leaves '+' alone, which form decoding would read as a space.
-            let body = c.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B") ?? ""
+            // Strict encoding: Proxmox splits form fields on ';' as well as '&', and VM
+            // options such as "boot=order=scsi0;ide2" are full of ';', '=' and ','.
+            let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~")
+            let body = form.map { key, value in
+                (key.addingPercentEncoding(withAllowedCharacters: allowed) ?? key) + "="
+                    + (value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value)
+            }.joined(separator: "&")
             req.httpBody = Data(body.utf8)
             req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         }
@@ -310,10 +439,13 @@ final class ProxmoxClient: NSObject, URLSessionDelegate {
         // Proxmox puts the human-readable reason in the HTTP status line, which
         // URLSession doesn't expose; fall back to the JSON body.
         if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let msg = obj["message"] as? String { return msg.trimmingCharacters(in: .whitespacesAndNewlines) }
-            if let errors = obj["errors"] as? [String: String] {
-                return errors.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
+            // "Parameter verification failed." comes with the details per parameter in "errors".
+            var parts: [String] = []
+            if let msg = obj["message"] as? String { parts.append(msg.trimmingCharacters(in: .whitespacesAndNewlines)) }
+            if let errors = obj["errors"] as? [String: Any] {
+                parts += errors.sorted { $0.key < $1.key }.map { "\($0.key): \("\($0.value)".trimmingCharacters(in: .whitespacesAndNewlines))" }
             }
+            if !parts.isEmpty { return parts.joined(separator: "\n") }
         }
         return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }

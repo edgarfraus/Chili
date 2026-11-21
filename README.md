@@ -50,6 +50,9 @@ that talks to Proxmox VE for you.
 - **noVNC, containers and node shells too.** VMs without SPICE automatically open Proxmox' own noVNC
   console, LXC containers its xterm.js console, and the toolbar's **Shell** menu opens a shell on any node —
   all in the same tabs. (These web consoles need a password login, not an API token.)
+- **Create and manage VMs without the web UI.** A *New VM* wizard with two modes — *Recommended for
+  Chili* (just the essentials, everything else set up for the best console experience) and *Custom*
+  (every option, as in Proxmox) — plus shut down, reboot, stop and delete from each VM's menu.
 - **Opens `.vv` files.** The files that the Proxmox web UI downloads (*Console → SPICE*), or that oVirt
   and virt-manager produce, open with a double-click in a bare console window, without the rest of the app.
 - **Quick Connect** to any SPICE server by host and port, and `spice://` links.
@@ -142,6 +145,23 @@ The list shows every VM in the cluster, with its node, vCPUs and memory, and ref
 - For a stopped VM, **Start & Connect** boots it and opens the console as soon as it is up.
 - Use the filter field to search by name or VM ID.
 
+### Creating a VM
+
+Click **New VM** in the server's toolbar.
+
+- **Recommended for Chili**: choose node, name, operating system, installation ISO, CPU cores, memory,
+  disk and network. Chili adds the rest: SPICE display and audio, QEMU guest agent, q35 machine,
+  VirtIO SCSI disk with discard and IO thread, VirtIO network; for Windows 11 also UEFI with Secure Boot
+  and TPM 2.0. For Windows, pick the `virtio-win.iso` drivers ISO too (Chili mounts it as a second CD);
+  without it, Chili uses SATA and Intel network devices that Windows setup recognises by itself.
+- **Custom**: every option of the Proxmox wizard (VM ID, BIOS, machine, SCSI controller, disk bus, cache,
+  CPU sockets and type, ballooning, VLAN, display type, monitors…).
+- The CPU type defaults to `x86-64-v2` (or `host` on very old CPUs): Proxmox' own default,
+  `x86-64-v2-AES`, doesn't start on hosts without AES-NI.
+- With **Start the VM and open its console** ticked, the new VM boots straight into a console tab.
+
+Each VM's **…** menu also has **Shut Down**, **Reboot**, **Stop** and **Delete** (both ask first).
+
 ### Using an API token instead of a password (recommended)
 
 An API token can be revoked at any time, works with 2FA-protected accounts and can be limited to just
@@ -230,6 +250,7 @@ details, turn on **Settings → Verbose viewer logging** and reproduce the probl
 | Certificate warning again after a Proxmox upgrade | The certificate changed: compare the new fingerprint, then trust it. **Settings → Forget Trusted Certificates** resets all. |
 | No resize, no clipboard | Install `spice-guest-tools` (Windows) or `spice-vdagent` (Linux) in the guest. |
 | No sound | Add an *Audio Device* with driver **SPICE** to the VM. |
+| macOS asks to allow access to the Keychain | Click **Always Allow**. Without an Apple Developer ID signature, macOS asks again once after each update of the app. |
 | The app "is damaged and can't be opened" | It was downloaded with quarantine and isn't notarized: see [First launch](#first-launch). |
 
 ## Privacy and security

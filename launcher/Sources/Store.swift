@@ -56,40 +56,52 @@ final class ProfileStore: ObservableObject {
     }
 }
 
+/// Passwords and token secrets in the login Keychain.
+///
+/// macOS ties each item to the app that created it; for apps without an Apple
+/// Developer ID that means the exact build, so after an update macOS asks once
+/// for access ("Always Allow" answers it for good). To keep those prompts to a
+/// minimum we read each secret at most once per launch and only write it when
+/// it actually changes.
 enum Keychain {
     private static let service = (Bundle.main.bundleIdentifier ?? "Chili") + ".servers"
+    private static var cache: [String: String?] = [:]
+
+    private static func query(_ account: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: service,
+         kSecAttrAccount as String: account]
+    }
 
     static func save(_ secret: String, account: String) {
-        delete(account: account)
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked,
-            kSecValueData as String: Data(secret.utf8),
-        ]
-        SecItemAdd(query as CFDictionary, nil)
+        if case .some(.some(let current)) = cache[account], current == secret { return }
+        if load(account: account) == secret { return }
+        let data = Data(secret.utf8)
+        let status = SecItemUpdate(query(account) as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if status == errSecItemNotFound {
+            var add = query(account)
+            add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
+            add[kSecValueData as String] = data
+            SecItemAdd(add as CFDictionary, nil)
+        }
+        cache[account] = secret
     }
 
     static func load(account: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
+        if let cached = cache[account] { return cached }
+        var q = query(account)
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
         var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess, let data = item as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+        let status = SecItemCopyMatching(q as CFDictionary, &item)
+        let value = status == errSecSuccess ? (item as? Data).flatMap { String(data: $0, encoding: .utf8) } : nil
+        // Don't cache a refused/cancelled prompt as "no password".
+        if status == errSecSuccess || status == errSecItemNotFound { cache[account] = value }
+        return value
     }
 
     static func delete(account: String) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-        ]
-        SecItemDelete(query as CFDictionary)
+        SecItemDelete(query(account) as CFDictionary)
+        cache[account] = .some(nil)
     }
 }
