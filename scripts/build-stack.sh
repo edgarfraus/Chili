@@ -15,6 +15,7 @@ PKGCONF=(https://distfiles.ariadne.space/pkgconf/pkgconf-3.0.11.tar.xz d0cd841bc
 BISON=(https://ftpmirror.gnu.org/bison/bison-3.8.2.tar.xz 9bba0214ccf7f1079c5d59210045227bcf619519840ebfa80cd3849cff5a5bf2)
 NASM=(https://www.nasm.us/pub/nasm/releasebuilds/3.02/nasm-3.02.tar.xz 87336eba53b4acfe917424ab5d500d2b0054d9f5148d35c2273ccf2cfb712f0d)
 RUSTUP_VERSION=1.29.3
+CARGO_C_VERSION=0.10.26
 PY_TOOLS=(meson==1.12.1 ninja==1.13.0 cmake==4.1.2 pyparsing==3.2.5 six==1.17.0 packaging docutils)
 
 LIBFFI=(https://github.com/libffi/libffi/releases/download/v3.8.1/libffi-3.8.1.tar.gz 81e879c094cc5ec3186c48510c6385ac6b3e866192e8bc71a35245703757ee40)
@@ -98,9 +99,27 @@ tool_rust() {
     cargo --version
 }
 
+tool_cargo_c() {
+    # librsvg builds its C library with cargo-c. Host tool: don't leak our target flags in.
+    env -u CFLAGS -u LDFLAGS -u CPPFLAGS cargo install --locked --version "$CARGO_C_VERSION" cargo-c
+}
+
 # ---------------------------------------------------------------------------
 # Libraries (installed into $PREFIX, shipped in the app)
 # ---------------------------------------------------------------------------
+# zlib comes with macOS, but without the zlib.pc that pkg-config users expect.
+lib_zlib_pc() {
+    local v; v=$(sed -n 's/^#define ZLIB_VERSION "\(.*\)"/\1/p' "$SDKROOT/usr/include/zlib.h")
+    mkdir -p "$PREFIX/lib/pkgconfig"
+    cat > "$PREFIX/lib/pkgconfig/zlib.pc" <<PC
+Name: zlib
+Description: zlib compression library (macOS SDK)
+Version: $v
+Libs: -lz
+Cflags:
+PC
+}
+
 lib_libffi() {
     local s; s=$(unpack "$(fetch "${LIBFFI[@]}")" libffi)
     autotools_build "$s" --disable-docs --disable-multi-os-directory
@@ -213,7 +232,7 @@ lib_libepoxy() {
 lib_atk() {
     local s; s=$(unpack "$(fetch "${ATSPI[@]}")" at-spi2-core)
     # Only ATK: the D-Bus accessibility bridge is X11/Wayland-only.
-    meson_build "$s" -Datk_only=true -Dintrospection=disabled -Ddocs=false
+    meson_build "$s" -Datk_only=true -Dx11=disabled -Dintrospection=disabled -Ddocs=false
 }
 
 lib_gtk3() {
@@ -271,21 +290,25 @@ lib_lz4() {
 }
 
 # GStreamer is only used by spice-gtk for audio playback/recording and for
-# hardware video decoding, so we build a deliberately small plugin set.
+# hardware video decoding (applemedia/VideoToolbox, which needs libgstgl),
+# so we build a deliberately small plugin set.
 lib_gstreamer() {
     local s; s=$(unpack "$(fetch "${GSTREAMER[@]}")" gstreamer)
-    local common=(-Dauto_features=disabled -Dnls=disabled -Dexamples=disabled -Dtests=disabled -Ddoc=disabled -Dintrospection=disabled)
+    local base=(-Dauto_features=disabled -Dnls=disabled -Dexamples=disabled -Dtests=disabled -Ddoc=disabled)
+    local common=("${base[@]}" -Dintrospection=disabled)
     meson_build "$s/subprojects/gstreamer" "${common[@]}" -Dtools=enabled \
         -Dbenchmarks=disabled -Dcheck=enabled -Dgst_parse=true -Dregistry=true \
         -Dptp-helper=disabled -Dbash-completion=disabled -Dlibunwind=disabled -Dlibdw=disabled
     meson_build "$s/subprojects/gst-plugins-base" "${common[@]}" -Dtools=enabled \
         -Dapp=enabled -Daudioconvert=enabled -Daudioresample=enabled -Dplayback=enabled \
         -Dtypefind=enabled -Dvideoconvertscale=enabled -Dvolume=enabled -Daudiotestsrc=enabled \
-        -Dgl=disabled -Dorc=disabled
-    meson_build "$s/subprojects/gst-plugins-good" "${common[@]}" \
+        -Dorc=disabled -Dgl=enabled -Dgl_api=opengl -Dgl_platform=cgl -Dgl_winsys=cocoa \
+        -Dgl-graphene=disabled -Dgl-png=disabled -Dgl-jpeg=disabled
+    # gst-plugins-good has no introspection option.
+    meson_build "$s/subprojects/gst-plugins-good" "${base[@]}" \
         -Dosxaudio=enabled -Dautodetect=enabled -Djpeg=enabled
     meson_build "$s/subprojects/gst-plugins-bad" "${common[@]}" \
-        -Dapplemedia=enabled -Dvideoparsers=enabled -Dgl=disabled
+        -Dapplemedia=enabled -Dvideoparsers=enabled -Dgl=enabled
 }
 
 lib_spice_protocol() {
@@ -311,12 +334,12 @@ lib_virt_viewer() {
 
 # ---------------------------------------------------------------------------
 STEPS=(
-    tool_pkgconf tool_bison tool_python tool_rust
-    lib_libffi lib_gettext lib_pcre2 lib_glib
+    tool_pkgconf tool_bison tool_python tool_rust tool_cargo_c
+    lib_zlib_pc lib_libffi lib_gettext lib_pcre2 lib_glib
     lib_libpng lib_jpeg lib_expat lib_freetype lib_fontconfig
     lib_pixman lib_fribidi lib_harfbuzz lib_cairo lib_pango
-    lib_gdk_pixbuf lib_librsvg lib_libepoxy lib_atk lib_gtk3 lib_icon_themes
-    lib_libxml2 lib_json_glib lib_openssl lib_opus lib_lz4
+    lib_gdk_pixbuf lib_libxml2 lib_librsvg lib_libepoxy lib_atk lib_gtk3 lib_icon_themes
+    lib_json_glib lib_openssl lib_opus lib_lz4
     lib_gstreamer lib_spice_protocol lib_spice_gtk lib_virt_viewer
 )
 [[ "$ARCH" == x86_64 ]] && STEPS=(tool_nasm "${STEPS[@]}")

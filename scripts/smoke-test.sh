@@ -18,18 +18,18 @@ out="$("$VC/MacOS/remote-viewer" --version 2>&1)" || die "remote-viewer failed t
 echo "    $out"
 
 msg "GStreamer plugin scan"
-export GST_PLUGIN_SYSTEM_PATH_1_0="$VC/PlugIns/gstreamer-1.0"
+export GST_PLUGIN_SYSTEM_PATH_1_0="$VC/Resources/lib/gstreamer-1.0"
 export GST_PLUGIN_SCANNER_1_0="$VC/MacOS/gst-plugin-scanner"
 export GST_REGISTRY_1_0="$(mktemp -d)/registry.bin"
-for p in "$VC"/PlugIns/gstreamer-1.0/*.dylib; do
+for p in "$VC"/Resources/lib/gstreamer-1.0/*.dylib; do
     # dlopen every plugin through dyld; a missing dependency aborts here.
     /usr/bin/python3 -c "import ctypes,sys; ctypes.CDLL(sys.argv[1])" "$p" \
         || die "plugin does not load: $(basename "$p")"
 done
-echo "    $(ls "$VC"/PlugIns/gstreamer-1.0 | wc -l | tr -d ' ') plugins load"
+echo "    $(ls "$VC"/Resources/lib/gstreamer-1.0 | wc -l | tr -d ' ') plugins load"
 
 msg "gdk-pixbuf loaders"
-for so in "$VC"/PlugIns/gdk-pixbuf/*.so; do
+for so in "$VC"/Resources/lib/gdk-pixbuf/loaders/*; do
     /usr/bin/python3 -c "import ctypes,sys; ctypes.CDLL(sys.argv[1])" "$so" || die "loader does not load: $so"
 done
 

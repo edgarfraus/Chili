@@ -8,8 +8,8 @@
 #     Helpers/Chili Viewer.app/       remote-viewer and its whole runtime
 #       Contents/MacOS/               remote-viewer, gst-plugin-scanner
 #       Contents/Frameworks/          every bundled dylib
-#       Contents/PlugIns/             GStreamer + gdk-pixbuf modules
-#       Contents/Resources/           share/ (icons, schemas, locale), etc/ (fonts, gtk-3.0)
+#       Contents/Resources/           lib/ (GStreamer + gdk-pixbuf modules, signed one by one),
+#                                     share/ (icons, schemas, locale), etc/ (fonts, gtk-3.0)
 #
 # Environment: BUNDLE_ID, PROJECT_URL, CODESIGN_IDENTITY (default "-" = ad-hoc).
 
@@ -32,8 +32,8 @@ VC="$VIEWER/Contents"
 msg "Assembling $APP"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" \
-         "$VC/MacOS" "$VC/Frameworks" "$VC/PlugIns/gstreamer-1.0" "$VC/PlugIns/gdk-pixbuf" \
-         "$VC/PlugIns/gio-modules" "$VC/Resources/share" "$VC/Resources/etc" "$VC/Resources/lib/gdk-pixbuf-2.0"
+         "$VC/MacOS" "$VC/Frameworks" "$VC/Resources/lib/gstreamer-1.0" "$VC/Resources/lib/gdk-pixbuf/loaders" \
+         "$VC/Resources/share" "$VC/Resources/etc" "$VC/Resources/lib/gdk-pixbuf-2.0"
 
 render() {  # render TEMPLATE DEST
     sed -e "s|@BUNDLE_ID@|$BUNDLE_ID|g" -e "s|@VERSION@|$VERSION|g" \
@@ -59,15 +59,10 @@ printf 'APPL????' > "$VC/PkgInfo"
 cp "$PREFIX/bin/remote-viewer" "$VC/MacOS/"
 cp "$PREFIX/libexec/gstreamer-1.0/gst-plugin-scanner" "$VC/MacOS/"
 
-cp "$PREFIX"/lib/gstreamer-1.0/*.dylib "$VC/PlugIns/gstreamer-1.0/"
+cp "$PREFIX"/lib/gstreamer-1.0/*.dylib "$VC/Resources/lib/gstreamer-1.0/"
 pixbuf_moddir="$("$PKG_CONFIG" --variable=gdk_pixbuf_moduledir gdk-pixbuf-2.0)"
-cp "$pixbuf_moddir"/*.so "$VC/PlugIns/gdk-pixbuf/" 2>/dev/null || true
+cp "$pixbuf_moddir"/*.so "$pixbuf_moddir"/*.dylib "$VC/Resources/lib/gdk-pixbuf/loaders/" 2>/dev/null || true
 
-# gdk-pixbuf wants absolute module paths; the launcher fills @PLUGINS@ in at runtime.
-GDK_PIXBUF_MODULEDIR="$VC/PlugIns/gdk-pixbuf" "$PREFIX/bin/gdk-pixbuf-query-loaders" \
-    | sed -e "s|$VC/PlugIns|@PLUGINS@|g" -e '/^#/d' \
-    > "$VC/Resources/lib/gdk-pixbuf-2.0/loaders.cache.in"
-grep -q '@PLUGINS@/gdk-pixbuf/' "$VC/Resources/lib/gdk-pixbuf-2.0/loaders.cache.in" || die "no SVG loader found"
 
 # share/: only what remote-viewer actually uses.
 S="$VC/Resources/share"
@@ -92,10 +87,17 @@ cp -R "$REPO_ROOT/resources/etc/" "$VC/Resources/etc/"
 
 # --- Make it self-contained ------------------------------------------------
 msg "Relocating libraries"
-roots=("$VC/MacOS/remote-viewer" "$VC/MacOS/gst-plugin-scanner" "$VC"/PlugIns/gstreamer-1.0/*.dylib)
-for so in "$VC"/PlugIns/gdk-pixbuf/*.so; do [[ -e "$so" ]] && roots+=("$so"); done
+roots=("$VC/MacOS/remote-viewer" "$VC/MacOS/gst-plugin-scanner" "$VC"/Resources/lib/gstreamer-1.0/*.dylib)
+for so in "$VC"/Resources/lib/gdk-pixbuf/loaders/*; do [[ -e "$so" ]] && roots+=("$so"); done
 "$TOOLS/venv/bin/python3" "$REPO_ROOT/scripts/relocate.py" \
     --prefix "$PREFIX" --frameworks "$VC/Frameworks" --bundle "$APP" "${roots[@]}"
+
+# gdk-pixbuf wants absolute module paths; the launcher fills @PLUGINS@ in at runtime.
+# Runs after relocation: the loaders only resolve their @rpath deps inside the bundle.
+"$PREFIX/bin/gdk-pixbuf-query-loaders" "$VC"/Resources/lib/gdk-pixbuf/loaders/* \
+    | sed -e "s|$VC/Resources/lib|@PLUGINS@|g" -e '/^#/d' \
+    > "$VC/Resources/lib/gdk-pixbuf-2.0/loaders.cache.in"
+grep -q '@PLUGINS@/gdk-pixbuf/' "$VC/Resources/lib/gdk-pixbuf-2.0/loaders.cache.in" || die "no SVG loader found"
 
 msg "Stripping"
 find "$VC" -type f \( -name '*.dylib' -o -name '*.so' \) -exec strip -x {} \; 2>/dev/null
@@ -107,7 +109,7 @@ sign_opts=(--force --sign "$CODESIGN_IDENTITY")
 if [[ "$CODESIGN_IDENTITY" != "-" ]]; then
     sign_opts+=(--timestamp --options runtime --entitlements "$REPO_ROOT/resources/entitlements.plist")
 fi
-find "$VC/Frameworks" "$VC/PlugIns" -type f \( -name '*.dylib' -o -name '*.so' \) -print0 \
+find "$VC/Frameworks" "$VC/Resources/lib" -type f \( -name '*.dylib' -o -name '*.so' \) -print0 \
     | xargs -0 codesign "${sign_opts[@]}"
 codesign "${sign_opts[@]}" "$VC/MacOS/gst-plugin-scanner"
 codesign "${sign_opts[@]}" "$VIEWER"

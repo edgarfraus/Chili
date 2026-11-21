@@ -79,7 +79,9 @@ final class ViewerLauncher {
     private var viewerApp: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/Chili Viewer.app") }
     private var viewerExecutable: URL { viewerApp.appendingPathComponent("Contents/MacOS/remote-viewer") }
     private var resources: URL { viewerApp.appendingPathComponent("Contents/Resources") }
-    private var plugins: URL { viewerApp.appendingPathComponent("Contents/PlugIns") }
+    // Loadable modules (GStreamer, gdk-pixbuf) live in Resources/lib like in GIMP/Inkscape:
+    // codesign only accepts bundles in PlugIns/ and subfolders of Frameworks/.
+    private var plugins: URL { resources.appendingPathComponent("lib") }
 
     lazy var cacheDir: URL = {
         let base = fm.urls(for: .cachesDirectory, in: .userDomainMask)[0]
@@ -158,7 +160,7 @@ final class ViewerLauncher {
         env["XDG_CACHE_HOME"] = cacheDir.path
         env["GSETTINGS_SCHEMA_DIR"] = share + "/glib-2.0/schemas"
         env["GSETTINGS_BACKEND"] = "memory"
-        env["GIO_MODULE_DIR"] = plugins.appendingPathComponent("gio-modules").path
+        env["GIO_MODULE_DIR"] = cacheDir.appendingPathComponent("no-gio-modules").path
         env["GTK_DATA_PREFIX"] = resources.path
         env["GTK_EXE_PREFIX"] = resources.path
         env["GTK_PATH"] = resources.path

@@ -65,7 +65,13 @@ step() {
     fi
     msg "Building $name"
     local log="$LOGS/$name.log" start=$SECONDS
-    if ( set -euo pipefail; "$fn" ) >"$log" 2>&1; then
+    # Not inside `if`: there bash would silently disable `set -e` for the whole step.
+    local rc=0
+    set +e
+    ( set -euo pipefail; "$fn" ) >"$log" 2>&1
+    rc=$?
+    set -e
+    if (( rc == 0 )); then
         mark_done "$name"
         echo "    done in $((SECONDS - start))s"
     else
