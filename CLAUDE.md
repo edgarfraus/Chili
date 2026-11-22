@@ -1,13 +1,14 @@
 # Chili — notes for Claude
 
-Chili is an unofficial SPICE client and Proxmox VE companion. The macOS app is done and in this repo;
-a **Windows version is next** — read [`docs/windows/PLAN.md`](docs/windows/PLAN.md) before starting it.
+Chili is an unofficial SPICE client and Proxmox VE companion. The macOS app is released (v1.0.0); the
+**Windows version** is in progress in `windows/` — see [`docs/windows/PLAN.md`](docs/windows/PLAN.md) and
+the status at the end.
 
 ## Working with the maintainer
 
 - The maintainer (GitHub `edgarfraus`) writes in **Italian**: answer in Italian. Code, comments,
   commit messages and docs are in English; user-facing strings are English with Italian translations.
-- They test on a real Proxmox VE server, **EDG_Lab** (single node `pve01`). Rules agreed for it:
+- They test on a real Proxmox VE server, **EDG_Lab** (single node `lab`, API at 192.168.250.104:8006). Rules agreed for it:
   - You may create test machines, always named `chili-test-*` (VMs: `name`, containers: `hostname`),
     small (≤ 4 GB disk, ≤ 1 GB RAM unless needed), and delete them when done.
   - Before deleting anything, read the machine's **config** (`name` / `hostname`) and refuse unless it
@@ -43,9 +44,33 @@ needs no screen-recording permission), `CHILI_DEBUG_ACTION=…` (see `runDebugAc
 `inventory`, `create:<variant>`, `ctcreate`, `cleanup`, `tasklog:<id>`, `journal`, `wizard[-win][-custom]`,
 `ctwizard`, `logs`, `syslog`, `opentest`, `closetest`, `quickdump`, `novnc:<id>`, `spice:<id>`, `shell`).
 
+## Repository layout (Windows)
+
+| Path | What |
+|---|---|
+| `windows/src/Chili.Core/` | net10.0 library: Proxmox client, VM/CT drafts, `.vv` parsing, localization (reads the macOS `Localizable.strings` + `Strings/it.windows.strings`) |
+| `windows/src/Chili/` | WinUI 3 app, unpackaged + self-contained: views, wizards, logs, built-in SPICE console (`Spice/`) |
+| `windows/native/chili-spice.{h,c}` | C shim over spice-client-glib (port of SpiceKit), called through P/Invoke |
+| `windows/scripts/bundle-viewer.sh` | Run in MSYS2 UCRT64: builds `chili-spice.dll`, collects remote-viewer + GTK/GStreamer into `windows/build/viewer` (the app build copies it to `viewer\`) |
+| `windows/tests/Chili.Core.Tests/` | xUnit: parameter sets, `.vv`, host parsing, form encoding, every UI string has Italian |
+
+Tools on the Windows machine: .NET 10 SDK, MSYS2 (`mingw-w64-ucrt-x86_64-{virt-viewer,ntldd,gst-plugins-good,gst-plugins-bad}`), `gh`.
+Build: `dotnet build windows/src/Chili/Chili.csproj -p:Platform=x64`; tests: `dotnet test windows/tests/Chili.Core.Tests`.
+Same dev aids as on macOS: `CHILI_DEMO`, `CHILI_LANG=it|en`, `CHILI_DEBUG_SNAPSHOT` (rendered from the XAML
+tree, so it works in a disconnected RDP session), `CHILI_DEBUG_ACTION` (`editor`, `edit`, `quick`, `login`,
+`cert`, `alert`, `wizard[-custom|-win]`, `ctwizard`, `logs`, `syslog`, `spice:<id>` with optional
+`CHILI_DEBUG_CLOSE_AFTER=<s>`, live tests `create:<linux,win11,win11-nodrivers,custom>`, `ctcreate`, `cleanup`;
+see `MainWindow.RunDebugAction` and `DebugActions.cs`).
+
 ## Status (2026-11-22)
 
-- macOS app feature-complete for v1.0.0 and tested on EDG_Lab (Intel Mac, macOS 26).
-- Pending: maintainer makes the repo public → run the GitHub Actions build (never run yet; arm64 never
-  built) → fix → tag `v1.0.0`.
-- Next: Windows version, per `docs/windows/PLAN.md`.
+- macOS: v1.0.0 tagged; CI builds the arm64 and x86_64 DMGs (first full run: 31 and 63 min).
+- Windows, done and tested on EDG_Lab: login (password/TOTP/token), certificate pinning, VM list with
+  dials, power actions, built-in SPICE console (display and guest resize verified; keyboard, mouse,
+  clipboard and audio still to be tried by the maintainer), remote-viewer fallback, VM and container
+  wizards, history & logs, node journal.
+- Windows, next: WebView2 for noVNC/xterm.js/node shell (opened in the browser for now), `.vv` and
+  `spice://` handling, settings page, Windows key / Alt+Tab capture (keyboard hook), installer,
+  `build-windows.yml`, README section.
+- CI gotcha: GitHub applies `[skip ci]` to tag pushes too (it reads the tagged commit's message). Start a
+  release build with `gh workflow run build.yml --ref v<version>`.
