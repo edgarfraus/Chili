@@ -276,6 +276,32 @@ public sealed partial class MainWindow : Window
                     Debug.Log($"spice: closed, consoles={model.Consoles.Count}");
                 }
                 break;
+            case "wizard" or "wizard-custom" or "wizard-win" when Detail.Content is ServerView wv:
+            {
+                var w = new VMWizardWindow(wv.Session, this);
+                w.Activate();
+                if (action == "wizard-custom") w.SetCustom(true);
+                if (action == "wizard-win") w.DebugSelectWindows();
+                break;
+            }
+            case "ctwizard" when Detail.Content is ServerView cv:
+                new ContainerWizardWindow(cv.Session, this).Activate();
+                break;
+            case "logs" when Detail.Content is ServerView lv && lv.Session.VMs.FirstOrDefault() is { } first:
+                new VMLogsWindow(lv.Session, first).Activate();
+                break;
+            case "syslog" when Detail.Content is ServerView sv2:
+                new NodeLogWindow(sv2.Session, (await sv2.Session.LoadNodesAsync()).FirstOrDefault() ?? "pve1").Activate();
+                break;
+            case var c when c.StartsWith("create:"):
+                foreach (var variant in c[7..].Split(',')) await DebugCreateVmAsync(variant);
+                break;
+            case "ctcreate":
+                await DebugCreateContainerAsync();
+                break;
+            case "cleanup":
+                await DebugCleanupAsync();
+                break;
             case "alert":
                 await model.PresentAsync(new Core.Proxmox.HttpProxmoxException(0, "Parameter verification failed.\nnet0: invalid format"));
                 break;

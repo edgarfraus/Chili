@@ -21,6 +21,22 @@
             <TextBlock x:Name="TitleText" Style="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center" />
             <CommandBar Grid.Column="1" x:Name="Toolbar" DefaultLabelPosition="Right" Background="Transparent"
                         IsDynamicOverflowEnabled="False">
+                <AppBarButton x:Name="NewButton" Icon="Add">
+                    <AppBarButton.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                            <MenuFlyoutItem x:Name="NewVmItem" Click="OnNewVm" />
+                            <MenuFlyoutItem x:Name="NewCtItem" Click="OnNewContainer" />
+                        </MenuFlyout>
+                    </AppBarButton.Flyout>
+                </AppBarButton>
+                <AppBarButton x:Name="NodeButton">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE756;" />
+                    </AppBarButton.Icon>
+                    <AppBarButton.Flyout>
+                        <MenuFlyout x:Name="NodeMenu" Placement="BottomEdgeAlignedRight" Opening="OnNodeMenuOpening" />
+                    </AppBarButton.Flyout>
+                </AppBarButton>
                 <AppBarButton x:Name="RefreshButton" Icon="Refresh" Click="OnRefresh" />
                 <AppBarButton x:Name="LogoutButton" Click="OnLogout">
                     <AppBarButton.Icon>

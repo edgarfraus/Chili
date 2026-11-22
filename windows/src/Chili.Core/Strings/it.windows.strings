@@ -12,3 +12,6 @@
 "Press Ctrl+Alt to release the mouse." = "Premi Ctrl+Alt per rilasciare il mouse.";
 "Send Ctrl+Alt+Del to the VM" = "Invia Ctrl+Alt+Canc alla VM";
 "The built-in console is missing. Please reinstall Chili." = "La console integrata non è presente. Reinstalla Chili.";
+
+/* Wizards and logs */
+"Loading…" = "Caricamento…";

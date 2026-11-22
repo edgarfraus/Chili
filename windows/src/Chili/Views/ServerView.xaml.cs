@@ -22,6 +22,12 @@ public sealed partial class ServerView : UserControl
         InitializeComponent();
 
         TitleText.Text = session.Profile.Title;
+        NewButton.Label = L.T("New");
+        ToolTipService.SetToolTip(NewButton, L.T("Create a virtual machine or a container"));
+        NewVmItem.Text = L.T("New Virtual Machine…");
+        NewCtItem.Text = L.T("New Container…");
+        NodeButton.Label = L.T("Node");
+        ToolTipService.SetToolTip(NodeButton, L.T("Shell and system log of a node"));
         RefreshButton.Label = L.T("Refresh");
         ToolTipService.SetToolTip(RefreshButton, L.T("Refresh the VM list"));
         LogoutButton.Label = L.T("Log Out");
@@ -77,7 +83,7 @@ public sealed partial class ServerView : UserControl
         ListPanel.Visibility = ready ? Visibility.Visible : Visibility.Collapsed;
         ConnectingPanel.Visibility = connecting ? Visibility.Visible : Visibility.Collapsed;
         LoginPanel.Visibility = !ready && !connecting ? Visibility.Visible : Visibility.Collapsed;
-        RefreshButton.Visibility = LogoutButton.Visibility = ready ? Visibility.Visible : Visibility.Collapsed;
+        NewButton.Visibility = NodeButton.Visibility = RefreshButton.Visibility = LogoutButton.Visibility = ready ? Visibility.Visible : Visibility.Collapsed;
 
         bool otp = state == ServerSession.SessionState.NeedsOtp;
         SecretBox.Visibility = otp ? Visibility.Collapsed : Visibility.Visible;
@@ -147,6 +153,31 @@ public sealed partial class ServerView : UserControl
 
     // MARK: Toolbar
 
+    private void OnNewVm(object sender, RoutedEventArgs e) => new VMWizardWindow(Session, window).Activate();
+
+    private void OnNewContainer(object sender, RoutedEventArgs e) => new ContainerWizardWindow(Session, window).Activate();
+
+    /// <summary>Per node: root shell (xterm.js) and system log.</summary>
+    private async void OnNodeMenuOpening(object? sender, object e)
+    {
+        NodeMenu.Items.Clear();
+        var loading = new MenuFlyoutItem { Text = L.T("Loading…"), IsEnabled = false };
+        NodeMenu.Items.Add(loading);
+        var nodes = await Session.LoadNodesAsync();
+        NodeMenu.Items.Clear();
+        foreach (var node in nodes)
+        {
+            var sub = new MenuFlyoutSubItem { Text = node };
+            var shell = new MenuFlyoutItem { Text = L.T("Shell") };
+            shell.Click += async (_, _) => await window.Consoles.OpenWebConsoleAsync(Session, new WebConsoleKind.NodeShell(node));
+            var log = new MenuFlyoutItem { Text = L.T("System Log") };
+            log.Click += (_, _) => new NodeLogWindow(Session, node).Activate();
+            sub.Items.Add(shell);
+            sub.Items.Add(log);
+            NodeMenu.Items.Add(sub);
+        }
+    }
+
     private void OnRefresh(object sender, RoutedEventArgs e) => Session.Refresh();
 
     private void OnLogout(object sender, RoutedEventArgs e)
@@ -212,6 +243,8 @@ public sealed partial class ServerView : UserControl
         {
             Add(L.T("Start"), () => Session.StartAsync(vm));
         }
+        menu.Items.Add(new MenuFlyoutSeparator());
+        Add(L.T("History & Logs…"), () => { new VMLogsWindow(Session, vm).Activate(); return Task.CompletedTask; });
         menu.Items.Add(new MenuFlyoutSeparator());
         Add(L.T("Delete…"), async () =>
         {
