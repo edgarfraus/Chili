@@ -407,6 +407,7 @@ private struct RecommendedForm: View {
             NumberField(title: "Disk size", value: $model.draft.diskSizeGB, range: 1...65536, unit: "GB")
             StoragePicker(title: "Disk storage", storages: model.diskStorages, selection: $model.draft.diskStorage)
             BridgePicker(bridges: model.bridges, selection: $model.draft.bridge)
+            NumberField(title: "VLAN tag (0 = none)", value: $model.draft.vlanTag, range: 0...4094)
             Divider().padding(.vertical, 4)
             CheckRow(title: "Start the VM and open its console", isOn: $model.draft.startAfterCreate)
             Row(nil) {

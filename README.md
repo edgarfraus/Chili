@@ -165,7 +165,7 @@ Each VM's **…** menu also has **Shut Down**, **Reboot**, **Stop** and **Delete
 ### Creating a container
 
 **New → New Container…** creates an LXC container: hostname, template, root password and/or SSH key,
-CPU, memory, disk, network (DHCP or static). Chili makes it unprivileged with nesting enabled (what
+CPU, memory, disk, network (bridge, VLAN tag, DHCP or static). Chili makes it unprivileged with nesting enabled (what
 systemd-based distributions and Docker need) and opens its console when it's up. The template list shows
 those already on your storages and, under *Download from Proxmox*, the official catalogue: pick one and
 Chili downloads it first. More options (ID, swap, IPv6, privileged, start at boot) are under *Advanced*.

@@ -22,6 +22,7 @@ struct ContainerDraft {
     var rootStorage = ""
     var rootSizeGB = 8
     var bridge = ""
+    var vlanTag = 0       // 0 = untagged
     var ipv4 = IPv4.dhcp
     var address = ""      // CIDR, e.g. 192.168.1.50/24
     var gateway = ""
@@ -54,6 +55,7 @@ struct ContainerDraft {
         if startAtBoot { p["onboot"] = "1" }
 
         var net = "name=eth0,bridge=\(bridge)"
+        if vlanTag > 0 { net += ",tag=\(vlanTag)" }
         switch ipv4 {
         case .dhcp: net += ",ip=dhcp"
         case .staticIP:
@@ -304,6 +306,7 @@ struct ContainerWizardView: View {
             NumberField(title: "Disk size", value: $model.draft.rootSizeGB, range: 1...65536, unit: "GB")
             StoragePicker(title: "Disk storage", storages: model.rootStorages, selection: $model.draft.rootStorage)
             BridgePicker(bridges: model.bridges, selection: $model.draft.bridge)
+            NumberField(title: "VLAN tag (0 = none)", value: $model.draft.vlanTag, range: 0...4094)
             Row("IPv4") {
                 Picker("", selection: $model.draft.ipv4) {
                     Text("DHCP").tag(ContainerDraft.IPv4.dhcp)

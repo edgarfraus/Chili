@@ -180,7 +180,7 @@ conferma).
 ### Creare un container
 
 **Nuovo → Nuovo container…** crea un container LXC: hostname, template, password di root e/o chiave SSH,
-CPU, memoria, disco, rete (DHCP o statica). Chili lo crea non privilegiato con il nesting attivo (quello
+CPU, memoria, disco, rete (bridge, tag VLAN, DHCP o statica). Chili lo crea non privilegiato con il nesting attivo (quello
 che serve a systemd e a Docker) e ne apre la console quando è pronto. L'elenco dei template mostra quelli
 già presenti negli storage e, sotto *Scarica da Proxmox*, il catalogo ufficiale: scegline uno e Chili lo
 scarica prima di creare il container. Altre opzioni (ID, swap, IPv6, privilegiato, avvio all'accensione)

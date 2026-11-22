@@ -206,6 +206,7 @@ enum DebugActions {
         model.draft.bridge = "vmbr0"
         model.draft.template = "local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst"
         model.draft.ipv4 = .staticIP
+        model.draft.vlanTag = 20
         model.loading = false
         return previewWindow(ContainerWizardView(model: model), size: NSSize(width: 640, height: 680))
     }
