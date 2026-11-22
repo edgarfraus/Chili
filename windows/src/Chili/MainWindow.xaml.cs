@@ -21,7 +21,7 @@ public sealed partial class MainWindow : Window
     public MainWindow(AppModel model)
     {
         this.model = model;
-        Consoles = new Consoles(model);
+        Consoles = new Consoles(model, this);
         InitializeComponent();
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1180, 760));
         if (AppWindow.Presenter is OverlappedPresenter p)
@@ -42,6 +42,24 @@ public sealed partial class MainWindow : Window
     private void BuildMenu(string? select)
     {
         Nav.MenuItems.Clear();
+        consoleIcons.Clear();
+        if (model.Consoles.Count > 0)
+        {
+            Nav.MenuItems.Add(new NavigationViewItemHeader { Content = L.T("Consoles") });
+            foreach (var console in model.Consoles)
+            {
+                var icon = new FontIcon { Glyph = "" };
+                consoleIcons[console.Id] = icon;
+                var item = new NavigationViewItem { Content = console.Title, Tag = ConsoleTag(console), Icon = icon };
+                var menu = new MenuFlyout();
+                var close = new MenuFlyoutItem { Text = L.T("Disconnect") };
+                close.Click += (_, _) => CloseConsole(console);
+                menu.Items.Add(close);
+                item.ContextFlyout = menu;
+                Nav.MenuItems.Add(item);
+                UpdateConsoleIcon(console);
+            }
+        }
         Nav.MenuItems.Add(new NavigationViewItem
         {
             Content = L.T("Quick Connect"), Tag = QuickTag, Icon = new FontIcon { Glyph = "" },
@@ -89,10 +107,65 @@ public sealed partial class MainWindow : Window
         {
             Detail.Content = new ServerView(model.Session(profile), this);
         }
+        else if (tag.StartsWith("console:") && model.Consoles.FirstOrDefault(c => ConsoleTag(c) == tag) is { } console)
+        {
+            Detail.Content = new ConsoleView(console, this);
+        }
         else
         {
             Detail.Content = null;
         }
+    }
+
+    // MARK: Consoles
+
+    private readonly Dictionary<Guid, FontIcon> consoleIcons = [];
+    private static string ConsoleTag(ConsoleSession c) => $"console:{c.Id}";
+
+    /// <summary>Opens a built-in SPICE console in the main window and connects it.</summary>
+    public void OpenConsole(Core.ViewerConfig config, string title, Func<Task<Core.ViewerConfig>>? freshConfig)
+    {
+        var session = new ConsoleSession(config, title, freshConfig, DispatcherQueue);
+        session.Changed += () => UpdateConsoleIcon(session);
+        model.Consoles.Add(session);
+        session.Connect();
+        BuildMenu(ConsoleTag(session));
+        Activate();
+    }
+
+    public void CloseConsole(ConsoleSession session)
+    {
+        if (IsFullScreen) ToggleFullScreen();
+        model.Consoles.Remove(session);
+        // Move the selection away before dropping the console (an empty detail pane otherwise).
+        string? next = shownTag == ConsoleTag(session)
+            ? model.Consoles.LastOrDefault() is { } other ? ConsoleTag(other) : QuickTag
+            : shownTag;
+        shownTag = null;
+        BuildMenu(next);
+        session.Close();
+    }
+
+    private void UpdateConsoleIcon(ConsoleSession session)
+    {
+        if (!consoleIcons.TryGetValue(session.Id, out var icon)) return;
+        var key = session.Connection.State switch
+        {
+            Spice.SpiceConnection.ConnectionState.Connected => "RunningBrush",
+            Spice.SpiceConnection.ConnectionState.Connecting => "WarningBrush",
+            _ => "TextFillColorSecondaryBrush",
+        };
+        icon.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[key];
+    }
+
+    public bool IsFullScreen => AppWindow.Presenter.Kind == AppWindowPresenterKind.FullScreen;
+
+    /// <summary>Full screen for the console: no sidebar, the display fills the screen.</summary>
+    public void ToggleFullScreen()
+    {
+        bool enter = !IsFullScreen;
+        AppWindow.SetPresenter(enter ? AppWindowPresenterKind.FullScreen : AppWindowPresenterKind.Overlapped);
+        Nav.IsPaneVisible = !enter;
     }
 
     private async void OnAddServer(object sender, TappedRoutedEventArgs e) => await EditServerAsync(null);
@@ -181,6 +254,27 @@ public sealed partial class MainWindow : Window
                 Debug.Log($"spice: state={view.Session.State} vm={target?.DisplayName} status={target?.Status} running=[{string.Join(", ", view.Session.VMs.Where(v => v.IsRunning && !v.IsContainer).Select(v => $"{v.VmId} {v.DisplayName}"))}]");
                 if (target is { IsRunning: true }) await Consoles.ConnectAsync(view.Session, target);
                 Debug.Log("spice: launched");
+                if (Environment.GetEnvironmentVariable("CHILI_DEBUG_CLOSE_AFTER") is { } secs && int.TryParse(secs, out var s))
+                {
+                    // Teardown check: close the console, then open and close it once more.
+                    for (int round = 0; round < 2; round++)
+                    {
+                        await Task.Delay(s * 1000);
+                        if (model.Consoles.LastOrDefault() is { } open)
+                        {
+                            Debug.Log($"spice: closing ({open.Connection.State})");
+                            CloseConsole(open);
+                        }
+                        if (round == 0 && target is { IsRunning: true })
+                        {
+                            await Task.Delay(2000);
+                            Nav.SelectedItem = Nav.MenuItems.OfType<NavigationViewItem>().First(i => i.Tag is string t && t.StartsWith("server:"));
+                            await Task.Delay(500);
+                            await Consoles.ConnectAsync(view.Session, target);
+                        }
+                    }
+                    Debug.Log($"spice: closed, consoles={model.Consoles.Count}");
+                }
                 break;
             case "alert":
                 await model.PresentAsync(new Core.Proxmox.HttpProxmoxException(0, "Parameter verification failed.\nnet0: invalid format"));

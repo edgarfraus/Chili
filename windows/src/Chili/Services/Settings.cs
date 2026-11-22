@@ -30,6 +30,10 @@ public sealed class Preferences
     public bool Fullscreen { get; set; }
     public bool ShowStoppedVMs { get; set; } = true;
     public bool ViewerDebugLog { get; set; }
+    public bool ResizeGuest { get; set; } = true;
+    public bool ShareClipboard { get; set; } = true;
+    /// <summary>remote-viewer in its own window instead of the built-in console.</summary>
+    public bool UseClassicViewer { get; set; }
     public string QuickHost { get; set; } = "";
     public int QuickPort { get; set; } = 5900;
     public bool QuickTls { get; set; }

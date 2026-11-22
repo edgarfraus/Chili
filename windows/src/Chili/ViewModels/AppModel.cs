@@ -14,6 +14,9 @@ public sealed class AppModel
     /// <summary>Shows a message to the user (set by the main window).</summary>
     public Func<string, string, Task>? ShowAlert { get; set; }
 
+    /// <summary>Open built-in consoles, in sidebar order.</summary>
+    public List<ConsoleSession> Consoles { get; } = [];
+
     public ServerSession Session(ServerProfile profile)
     {
         if (sessions.TryGetValue(profile.Id, out var s) && s.Profile == profile) return s;

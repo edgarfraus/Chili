@@ -90,8 +90,7 @@ public sealed class QuickConnectView : UserControl
         config["host"] = prefs.QuickHost;
         config[prefs.QuickTls ? "tls-port" : "port"] = prefs.QuickPort.ToString();
         if (password.Password.Length > 0) config["password"] = password.Password;
-        try { await ViewerLauncher.LaunchAsync(config, $"{prefs.QuickHost}:{prefs.QuickPort}", prefs.Fullscreen); }
-        catch (Exception e) { await model.PresentAsync(e); }
+        await window.Consoles.OpenSpiceAsync(config, $"{prefs.QuickHost}:{prefs.QuickPort}");
     }
 
     private async Task OpenFileAsync()
@@ -100,7 +99,6 @@ public sealed class QuickConnectView : UserControl
         picker.FileTypeFilter.Add(".vv");
         WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(window));
         if (await picker.PickSingleFileAsync() is not { } file) return;
-        try { await ViewerLauncher.LaunchAsync([file.Path]); }
-        catch (Exception e) { await model.PresentAsync(e); }
+        await window.Consoles.OpenFileAsync(file.Path);
     }
 }

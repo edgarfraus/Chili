@@ -8,6 +8,8 @@ namespace Chili;
 public partial class App : Application
 {
     public static AppModel Model { get; private set; } = null!;
+    /// <summary>Open windows (for finding a control's HWND).</summary>
+    public static List<Window> Windows { get; } = [];
     private MainWindow? window;
 
     public App()
@@ -28,6 +30,7 @@ public partial class App : Application
     {
         Model = new AppModel();
         window = new MainWindow(Model);
+        Windows.Add(window);
         window.Activate();
     }
 }

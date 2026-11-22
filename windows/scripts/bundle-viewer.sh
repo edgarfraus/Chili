@@ -2,7 +2,7 @@
 # Collects remote-viewer (virt-viewer) from MSYS2 into a self-contained folder that the app
 # ships as viewer\ next to Chili.exe:
 #
-#   viewer/bin/        remote-viewer.exe and every DLL it needs
+#   viewer/bin/        remote-viewer.exe, chili-spice.dll (built-in console), every DLL they need
 #   viewer/lib/        gstreamer-1.0 plugins, gdk-pixbuf loaders + loaders.cache (relative paths)
 #   viewer/share/      GSettings schemas, Adwaita/hicolor icons, translations
 #
@@ -25,6 +25,9 @@ mkdir -p "$OUT"/{bin,lib/gstreamer-1.0,share/glib-2.0/schemas,share/icons,share/
 
 msg "Executables and plugins"
 cp "$PREFIX/bin/remote-viewer.exe" "$OUT/bin/"
+# The built-in console: a thin C layer over spice-client-glib, called from C#.
+gcc -O2 -Wall -Wno-deprecated-declarations -shared -o "$OUT/bin/chili-spice.dll" \
+    "$REPO/windows/native/chili-spice.c" $(pkg-config --cflags --libs spice-client-glib-2.0)
 
 # Same set as the macOS build: playback plumbing, audio out, MJPEG/VP8/H.264 video streams.
 plugins=(
@@ -55,7 +58,7 @@ awk -v dir="$OUT/$pixbuf_rel/loaders" '
 grep -q 'pixbufloader_svg' "$OUT/$pixbuf_rel/loaders.cache" || { echo "no SVG loader in loaders.cache" >&2; exit 1; }
 
 msg "Libraries"
-roots=("$OUT/bin/remote-viewer.exe"
+roots=("$OUT/bin/remote-viewer.exe" "$OUT/bin/chili-spice.dll"
        "$OUT"/lib/gstreamer-1.0/*.dll "$OUT/$pixbuf_rel"/loaders/*.dll)
 prefix_win=$(cygpath -w "$PREFIX" | tr '\\' '/')
 ntldd -R "${roots[@]}" 2>/dev/null | tr '\\' '/' \

@@ -188,6 +188,7 @@ public class ViewerConfigTests
     }
 }
 
+[Collection("Localization")]   // L is global: don't switch languages in parallel
 public class LocalizationTests
 {
     [Fact]
@@ -215,6 +216,7 @@ public class LocalizationTests
     }
 }
 
+[Collection("Localization")]
 public class TranslationCoverageTests
 {
     /// <summary>Every L.T / L.F literal in the Windows sources has an Italian entry
