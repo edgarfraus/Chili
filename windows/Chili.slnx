@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Chili.Core/Chili.Core.csproj" />
+    <Project Path="src/Chili/Chili.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Chili.Core.Tests/Chili.Core.Tests.csproj" />
+  </Folder>
+</Solution>

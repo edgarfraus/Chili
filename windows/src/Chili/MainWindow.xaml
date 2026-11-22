@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="Chili.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Chili">
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <NavigationView
+        x:Name="Nav"
+        PaneDisplayMode="Left"
+        IsBackButtonVisible="Collapsed"
+        IsSettingsVisible="False"
+        IsPaneToggleButtonVisible="False"
+        OpenPaneLength="230"
+        SelectionChanged="OnSelectionChanged">
+        <NavigationView.FooterMenuItems>
+            <NavigationViewItem x:Name="AddServerItem" SelectsOnInvoked="False" Tapped="OnAddServer">
+                <NavigationViewItem.Icon>
+                    <SymbolIcon Symbol="Add" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+        </NavigationView.FooterMenuItems>
+        <ContentControl
+            x:Name="Detail"
+            HorizontalContentAlignment="Stretch"
+            VerticalContentAlignment="Stretch" />
+    </NavigationView>
+</Window>

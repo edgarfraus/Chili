@@ -1,0 +1,241 @@
+using System.Globalization;
+using System.Text;
+using Chili.Core;
+using Chili.Core.Proxmox;
+
+namespace Chili.Core.Tests;
+
+public class DraftTests
+{
+    /// <summary>The parameter set verified on a real Proxmox server (docs/windows/PLAN.md §3).</summary>
+    [Fact]
+    public void Windows11RecommendedWithDrivers()
+    {
+        var d = new VMDraft
+        {
+            Node = "pve01", VmId = 106, Name = "chili-test-win11", Os = VMDraft.OS.Win11,
+            Iso = "local:iso/Win11.iso", VirtioIso = "local:iso/virtio-win.iso",
+            DiskStorage = "local-lvm", DiskSizeGB = 64, Cores = 4, MemoryMiB = 8192, Bridge = "vmbr0",
+        };
+        d.ApplyChiliPreset();
+        var expected = new Dictionary<string, string>
+        {
+            ["vmid"] = "106", ["name"] = "chili-test-win11", ["ostype"] = "win11", ["machine"] = "q35", ["bios"] = "ovmf",
+            ["efidisk0"] = "local-lvm:1,efitype=4m,pre-enrolled-keys=1", ["tpmstate0"] = "local-lvm:1,version=v2.0",
+            ["scsihw"] = "virtio-scsi-single", ["scsi0"] = "local-lvm:64,discard=on,iothread=1,ssd=1",
+            ["ide2"] = "local:iso/Win11.iso,media=cdrom", ["ide0"] = "local:iso/virtio-win.iso,media=cdrom",
+            ["sockets"] = "1", ["cores"] = "4", ["cpu"] = "x86-64-v2", ["memory"] = "8192",
+            ["net0"] = "virtio,bridge=vmbr0,firewall=1", ["vga"] = "qxl",
+            ["audio0"] = "device=ich9-intel-hda,driver=spice", ["agent"] = "enabled=1",
+            ["boot"] = "order=scsi0;ide2;net0",
+        };
+        Assert.Equal(expected.OrderBy(k => k.Key), d.Parameters.OrderBy(k => k.Key));
+        Assert.Empty(d.Problems);
+    }
+
+    [Fact]
+    public void WindowsWithoutDriversUsesSataAndE1000e()
+    {
+        var d = new VMDraft { Os = VMDraft.OS.Win10, DiskStorage = "local-lvm", Bridge = "vmbr0", VlanTag = 20 };
+        d.ApplyChiliPreset();
+        var p = d.Parameters;
+        Assert.Equal("local-lvm:32,discard=on,ssd=1", p["sata0"]);
+        Assert.Equal("e1000e,bridge=vmbr0,firewall=1,tag=20", p["net0"]);
+        Assert.Equal("order=sata0;ide2;net0", p["boot"]);
+        Assert.False(p.ContainsKey("tpmstate0"));
+        Assert.False(p.ContainsKey("ide0"));
+    }
+
+    [Fact]
+    public void LinuxPreset()
+    {
+        var d = new VMDraft { Os = VMDraft.OS.Linux, DiskStorage = "local-lvm", Bridge = "vmbr0", RecommendedCpuType = "host" };
+        d.ApplyChiliPreset();
+        var p = d.Parameters;
+        Assert.Equal("seabios", p["bios"]);
+        Assert.Equal("host", p["cpu"]);
+        Assert.Equal("local-lvm:32,discard=on,iothread=1", p["scsi0"]);
+        Assert.Equal("none,media=cdrom", p["ide2"]);
+        Assert.False(p.ContainsKey("efidisk0"));
+    }
+
+    [Fact]
+    public void CustomDisplayDropsAudio()
+    {
+        var d = new VMDraft { DiskStorage = "s", Bridge = "b", DisplayType = VMDraft.Display.Std, Audio = true };
+        Assert.Equal("std", d.Parameters["vga"]);
+        Assert.False(d.Parameters.ContainsKey("audio0"));
+        d.DisplayType = VMDraft.Display.Spice;
+        d.Monitors = 3;
+        Assert.Equal("qxl3", d.Parameters["vga"]);
+    }
+
+    [Theory]
+    [InlineData("fpu cx16 lahf_lm popcnt sse4_1 sse4_2 ssse3 aes", "x86-64-v2")]
+    [InlineData("fpu cx16 lahf_lm popcnt sse4_1 ssse3", "host")]
+    [InlineData(null, "x86-64-v2")]
+    public void CpuTypeFromFlags(string? flags, string expected) =>
+        Assert.Equal(expected, VMDraft.CpuTypeForHostFlags(flags));
+
+    [Fact]
+    public void ValidationMessages()
+    {
+        var d = new VMDraft { VmId = 99, Name = "bad_name" };
+        Assert.Equal(5, d.Problems.Count);
+    }
+
+    [Fact]
+    public void ContainerParameters()
+    {
+        var c = new ContainerDraft
+        {
+            VmId = 106, Hostname = "chili-test-ct", Template = "local:vztmpl/alpine.tar.xz", Password = "secret",
+            PasswordConfirm = "secret", MemoryMiB = 256, RootStorage = "local-lvm", RootSizeGB = 2, Bridge = "vmbr0",
+            VlanTag = 5, Node = "pve01",
+        };
+        var p = c.Parameters("local:vztmpl/alpine.tar.xz");
+        Assert.Equal("name=eth0,bridge=vmbr0,tag=5,ip=dhcp,ip6=auto,firewall=1", p["net0"]);
+        Assert.Equal("local-lvm:2", p["rootfs"]);
+        Assert.Equal("nesting=1", p["features"]);
+        Assert.Equal("1", p["unprivileged"]);
+        Assert.Empty(c.Problems);
+
+        c.Ipv4 = ContainerDraft.IPv4.Static;
+        c.Address = "192.168.1.50";
+        c.Password = "abc";
+        Assert.Equal(3, c.Problems.Count); // no prefix, too short, mismatch
+        c.Address = "192.168.1.50/24";
+        c.Gateway = "192.168.1.1";
+        c.Ipv6 = ContainerDraft.IPv6.None;
+        Assert.Equal("name=eth0,bridge=vmbr0,tag=5,ip=192.168.1.50/24,gw=192.168.1.1,firewall=1",
+                     c.Parameters("x")["net0"]);
+    }
+}
+
+public class ClientTests
+{
+    [Theory]
+    [InlineData("https://pve:8006/#v1:0:18:4:::::", "pve", 8006)]
+    [InlineData("  pve.example.com  ", "pve.example.com", null)]
+    [InlineData("192.168.1.10:8443", "192.168.1.10", 8443)]
+    [InlineData("https://[fd00::1]:8006/", "[fd00::1]", 8006)]
+    [InlineData("fd00::1", "[fd00::1]", null)]
+    [InlineData("[fd00::1]", "[fd00::1]", null)]
+    public void HostNormalisation(string input, string host, int? port)
+    {
+        Assert.Equal(host, ProxmoxClient.NormalizedHost(input));
+        Assert.Equal(port, ProxmoxClient.PortIn(input));
+    }
+
+    [Fact]
+    public void FormEncodingIsStrict()
+    {
+        var body = ProxmoxClient.FormEncode([new("boot", "order=scsi0;ide2;net0"), new("name", "a b&c~é")]);
+        Assert.Equal("boot=order%3Dscsi0%3Bide2%3Bnet0&name=a%20b%26c~%C3%A9", body);
+    }
+
+    [Fact]
+    public void ErrorMessageCombinesMessageAndErrors()
+    {
+        var body = Encoding.UTF8.GetBytes("""{"message":"Parameter verification failed.\n","errors":{"net0":"invalid format","boot":"bad"},"data":null}""");
+        Assert.Equal("Parameter verification failed.\nboot: bad\nnet0: invalid format", ProxmoxClient.ErrorMessage("x", body));
+        Assert.Equal("proxy not allowed", ProxmoxClient.ErrorMessage("proxy not allowed", []));
+        Assert.Equal("proxy not allowed", ProxmoxClient.ErrorMessage("proxy not allowed", Encoding.UTF8.GetBytes("""{"data":null}""")));
+    }
+
+    [Fact]
+    public void JournalMarkers()
+    {
+        Assert.True(ProxmoxClient.IsJournalMarker("s=abc;i=12;b=ff;m=1;t=2;x=3"));
+        Assert.True(ProxmoxClient.IsJournalMarker("-- No entries --"));
+        Assert.False(ProxmoxClient.IsJournalMarker("Nov 22 10:00:00 pve01 systemd[1]: Started x."));
+    }
+
+    [Fact]
+    public void WebConsoleUris()
+    {
+        using var c = new ProxmoxClient("pve", 8006, new NoTrust());
+        var vm = new ProxmoxVM { VmId = 101, Name = "web server", Node = "pve01", Type = "qemu" };
+        Assert.Equal("https://pve:8006/?console=kvm&novnc=1&vmid=101&vmname=web%20server&node=pve01&resize=scale",
+                     c.WebConsoleUri(new WebConsoleKind.Vm(vm)).AbsoluteUri);
+        Assert.Equal("https://pve:8006/?console=shell&xtermjs=1&node=pve01",
+                     c.WebConsoleUri(new WebConsoleKind.NodeShell("pve01")).AbsoluteUri);
+    }
+
+    private sealed class NoTrust : ITrustStore
+    {
+        public bool IsTrusted(string host, int port, string fingerprint) => false;
+    }
+}
+
+public class ViewerConfigTests
+{
+    [Fact]
+    public void ParsesProxmoxVvFile()
+    {
+        var text = "[virt-viewer]\r\nsecure-attention=ctrl+alt+ins\r\ntype=spice\r\nhost=pvespiceproxy:abc:101:pve01::xyz\r\n" +
+                   "tls-port=61000\r\npassword=s3cr=t\r\nproxy=http://pve:3128\r\nca=-----BEGIN CERTIFICATE-----\\nMIIF\\n-----END CERTIFICATE-----\\n\r\n" +
+                   "delete-this-file=1\r\n";
+        var c = ViewerConfig.Parse(text);
+        Assert.Equal("s3cr=t", c["password"]);
+        Assert.Equal("http://pve:3128", c["proxy"]);
+        Assert.StartsWith("-----BEGIN CERTIFICATE-----\\n", c["ca"]);
+        c["title"] = "VM";
+        c["password"] = null;
+        Assert.Equal("[virt-viewer]\nsecure-attention=ctrl+alt+ins\ntype=spice\nhost=pvespiceproxy:abc:101:pve01::xyz\n" +
+                     "tls-port=61000\nproxy=http://pve:3128\nca=-----BEGIN CERTIFICATE-----\\nMIIF\\n-----END CERTIFICATE-----\\n\n" +
+                     "delete-this-file=1\ntitle=VM\n", c.VvText);
+    }
+}
+
+public class LocalizationTests
+{
+    [Fact]
+    public void ParsesStringsFiles()
+    {
+        var pairs = L.ParseStrings("/* c */\n\"A \\\"b\\\"\" = \"x\\ny\";\n// line\n\"%@ of %d\" = \"%@ di %d\";").ToList();
+        Assert.Equal([("A \"b\"", "x\ny"), ("%@ of %d", "%@ di %d")], pairs);
+    }
+
+    [Fact]
+    public void FormatsPlaceholders() =>
+        Assert.Equal("3 vCPU on pve, 100%", L.Format("%d vCPU on %@, 100%%", 3, "pve"));
+
+    [Fact]
+    public void ItalianTableLoads()
+    {
+        try
+        {
+            L.Use(new CultureInfo("it-IT"));
+            Assert.Equal("Connessione rapida", L.T("Quick Connect"));
+            Assert.Equal("Connessione a pve…", L.F("Connecting to %@…", "pve"));
+            Assert.Equal("%@ non ha risposto in tempo.", L.T("%@ did not answer in time."));
+        }
+        finally { L.Use(CultureInfo.InvariantCulture); }
+    }
+}
+
+public class TranslationCoverageTests
+{
+    /// <summary>Every L.T / L.F literal in the Windows sources has an Italian entry
+    /// (launcher/Resources/it.lproj or Strings/it.windows.strings).</summary>
+    [Fact]
+    public void AllAppStringsAreTranslated()
+    {
+        var src = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src"));
+        var literal = new System.Text.RegularExpressions.Regex("""L\.[TF]\("((?:[^"\\]|\\.)*)"[,)]""");
+        var missing = new SortedSet<string>();
+        try
+        {
+            L.Use(new CultureInfo("it-IT"));
+            foreach (var file in Directory.EnumerateFiles(src, "*.cs", SearchOption.AllDirectories))
+                foreach (System.Text.RegularExpressions.Match m in literal.Matches(File.ReadAllText(file)))
+                {
+                    var key = m.Groups[1].Value.Replace("\\n", "\n").Replace("\\\"", "\"").Replace("\\\\", "\\");
+                    if (!L.IsTranslated(key)) missing.Add(key);
+                }
+        }
+        finally { L.Use(CultureInfo.InvariantCulture); }
+        Assert.True(missing.Count == 0, "Missing Italian strings:\n" + string.Join("\n", missing));
+    }
+}

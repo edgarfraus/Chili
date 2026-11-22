@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Platform-neutral logic shared by the app and the tests: Proxmox API client,
+       models, .vv files, VM/container drafts, localization. No UI code here. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Chili.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Italian strings: the macOS file is the source of truth (keys = English text);
+         Strings/it.windows.strings has the Windows-only ones and overrides. -->
+    <EmbeddedResource Include="..\..\..\launcher\Resources\it.lproj\Localizable.strings" LogicalName="it.strings" />
+    <EmbeddedResource Include="Strings\it.windows.strings" LogicalName="it.windows.strings" />
+  </ItemGroup>
+
+</Project>

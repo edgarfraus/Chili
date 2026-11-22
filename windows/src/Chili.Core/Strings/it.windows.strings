@@ -1,0 +1,7 @@
+/* Italiano — strings used only by the Windows app, and Windows wording for macOS ones. */
+
+"%@ did not answer in time." = "%@ non ha risposto in tempo.";
+"OK" = "OK";
+"Remember in Credential Manager" = "Ricorda in Gestione credenziali";
+"remote-viewer was not found. Please reinstall Chili." = "remote-viewer non è stato trovato. Reinstalla Chili.";
+"%@ uses a certificate that Windows doesn't trust. This is normal for Proxmox, which generates a self-signed certificate on install.\n\nCompare this SHA-256 fingerprint with the one shown in Proxmox under Node → System → Certificates:" = "%@ usa un certificato di cui Windows non si fida. È normale con Proxmox, che all'installazione genera un certificato autofirmato.\n\nConfronta questa impronta SHA-256 con quella mostrata in Proxmox in Nodo → Sistema → Certificati:";

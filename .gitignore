@@ -2,3 +2,9 @@
 /dist/
 .DS_Store
 *.swp
+
+# Windows (.NET)
+bin/
+obj/
+*.user
+.vs/
