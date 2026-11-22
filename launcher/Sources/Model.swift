@@ -181,7 +181,7 @@ final class ServerSession: ObservableObject {
     @Published var pendingCertificate: String?
     @Published var lastRefresh: Date?
     /// Recent usage per VM id, newest last (about 5 minutes).
-    @Published private(set) var history: [String: [UsageSample]] = [:]
+    @Published var history: [String: [UsageSample]] = [:]
     private var lastNetCounters: [String: (date: Date, netIn: Int64, netOut: Int64)] = [:]
     static let refreshInterval: TimeInterval = 5
     private static let historyLength = 60
@@ -193,6 +193,16 @@ final class ServerSession: ObservableObject {
         self.profile = profile
         self.app = app
         client = ProxmoxClient(host: profile.host, port: profile.port)
+        if Demo.isOn {
+            vms = Demo.vms
+            state = .ready
+            for vm in vms where vm.isRunning {
+                let rate = Double(vm.vmid % 7 + 1) * 37_000
+                history[vm.id] = [UsageSample(date: Date(), cpu: vm.cpu ?? 0,
+                                              memory: Double(vm.mem ?? 0) / Double(vm.maxmem ?? 1),
+                                              netIn: rate * 3.1, netOut: rate)]
+            }
+        }
     }
 
     var storedSecret: String? { Keychain.load(account: profile.id.uuidString) }
@@ -200,6 +210,7 @@ final class ServerSession: ObservableObject {
     var api: ProxmoxClient { client }
 
     func connectWithStoredSecret() {
+        if Demo.isOn { return }
         // Dev aid: UI tests without touching the Keychain or the server.
         if ProcessInfo.processInfo.environment["CHILI_DEBUG_NO_LOGIN"] != nil { return }
         guard state == .loggedOut, let secret = storedSecret else { return }
@@ -249,6 +260,7 @@ final class ServerSession: ObservableObject {
     }
 
     func reload() async throws {
+        if Demo.isOn { return }
         vms = try await client.virtualMachines()
         lastRefresh = Date()
         recordUsage()

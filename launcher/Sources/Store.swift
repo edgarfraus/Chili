@@ -30,6 +30,10 @@ final class ProfileStore: ObservableObject {
     private let key = "serverProfiles"
 
     init() {
+        if Demo.isOn {
+            profiles = [Demo.profile]
+            return
+        }
         if let data = UserDefaults.standard.data(forKey: key),
            let decoded = try? JSONDecoder().decode([ServerProfile].self, from: data) {
             profiles = decoded
@@ -37,6 +41,7 @@ final class ProfileStore: ObservableObject {
     }
 
     private func save() {
+        if Demo.isOn { return }   // never overwrite the real list with demo data
         if let data = try? JSONEncoder().encode(profiles) {
             UserDefaults.standard.set(data, forKey: key)
         }

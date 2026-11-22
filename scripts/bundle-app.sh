@@ -18,7 +18,7 @@ source "$(dirname "$0")/env.sh"
 source "$(dirname "$0")/lib.sh"
 
 BUNDLE_ID="${BUNDLE_ID:-io.github.edgarfraus.chili}"
-PROJECT_URL="${PROJECT_URL:-https://github.com/edgarfraus/chili-spice-macos}"
+PROJECT_URL="${PROJECT_URL:-https://github.com/edgarfraus/Chili}"
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
 VERSION="$(cat "$REPO_ROOT/VERSION")"
 BUILD="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"

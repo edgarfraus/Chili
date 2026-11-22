@@ -58,6 +58,8 @@ private struct Sidebar: View {
             }
         }
         .listStyle(.sidebar)
+        // Demo screenshots: offscreen rendering can't draw the sidebar's vibrancy.
+        .background(Demo.isOn ? Color(nsColor: .underPageBackgroundColor) : Color.clear)
         .frame(minWidth: 200)
         .safeAreaInset(edge: .bottom) {
             Button {
@@ -453,7 +455,9 @@ private struct UsageView: View {
     }
 
     static func rate(_ value: Double?) -> String {
-        ByteCountFormatter.string(fromByteCount: Int64(value ?? 0), countStyle: .binary) + "/s"
+        let v = Int64(value ?? 0)
+        // ByteCountFormatter says "Zero KB" for 0, which reads oddly in a rate.
+        return (v < 1 ? "0 KB" : ByteCountFormatter.string(fromByteCount: v, countStyle: .binary)) + "/s"
     }
 }
 

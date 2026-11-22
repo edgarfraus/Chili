@@ -161,7 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case "cleanup": whenReady { await DebugActions.cleanup(session) }
         case "ctcreate": whenReady { await DebugActions.containerTest(session) }
         case "journal": whenReady {
-            let node = session.vms.first?.node ?? "pve01"
+            let node = session.vms.first?.node ?? "pve1"
             do {
                 let lines = try await session.api.syslog(node: node, lines: 20)
                 DebugActions.log("journal \(lines.count) lines; last: \(lines.suffix(2))")
@@ -248,7 +248,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                                   backing: .buffered, defer: false)
             window.title = "Chili"
             window.contentView = NSHostingView(rootView: ContentView().environmentObject(model).environmentObject(model.profiles))
-            window.setFrameAutosaveName("MainWindow")
+            if Demo.isOn {
+                window.setContentSize(NSSize(width: 1180, height: 640))   // README screenshots
+            } else {
+                window.setFrameAutosaveName("MainWindow")
+            }
             window.isReleasedWhenClosed = false
             window.center()
             window.delegate = self

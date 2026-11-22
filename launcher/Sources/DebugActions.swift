@@ -141,7 +141,7 @@ enum DebugActions {
     /// Deletes every leftover chili-test-* VM.
     static func cleanup(_ session: ServerSession) async {
         try? await session.reload()
-        for vm in session.vms where vm.vmid != 100 && vm.vmid != 101 {
+        for vm in session.vms {
             await deleteVM(session, vm)   // only deletes chili-test-* (checked against the config)
         }
     }
@@ -150,24 +150,24 @@ enum DebugActions {
     static func previewWizard(app: AppModel, recommended: Bool, os: VMDraft.OS) -> NSWindow {
         let profile = ServerProfile(name: "Preview", host: "preview.invalid")
         let model = VMWizardModel(session: ServerSession(profile: profile, app: app))
-        model.nodes = ["pve01"]
+        model.nodes = ["pve1"]
         model.diskStorages = [
             .init(storage: "local-lvm", type: "lvmthin", content: "images", avail: 151_636_672_512, total: nil, active: 1),
-            .init(storage: "Data-SSD", type: "nfs", content: "images,iso", avail: 288_513_327_104, total: nil, active: 1),
+            .init(storage: "nas-iso", type: "nfs", content: "images,iso", avail: 288_513_327_104, total: nil, active: 1),
         ]
-        model.isos = [.init(volid: "Data-SSD:iso/Windows-11-30072025.iso", size: nil),
-                      .init(volid: "Data-SSD:iso/virtio-win.iso", size: nil),
-                      .init(volid: "Data-SSD:iso/alpine-standard-3.22.0-x86_64.iso", size: nil)]
+        model.isos = [.init(volid: "nas-iso:iso/Win11_24H2_English_x64.iso", size: nil),
+                      .init(volid: "nas-iso:iso/virtio-win-0.1.266.iso", size: nil),
+                      .init(volid: "nas-iso:iso/alpine-standard-3.22.0-x86_64.iso", size: nil)]
         model.bridges = [.init(iface: "vmbr0", type: "bridge", active: 1, comments: nil)]
         model.maxCores = 12
         model.maxMemoryMiB = 15_770
-        model.draft.node = "pve01"
+        model.draft.node = "pve1"
         model.draft.vmid = 106
         model.draft.os = os
         model.draft.diskStorage = "local-lvm"
         model.draft.efiStorage = "local-lvm"
         model.draft.bridge = "vmbr0"
-        model.draft.virtioISO = "Data-SSD:iso/virtio-win.iso"
+        model.draft.virtioISO = "nas-iso:iso/virtio-win-0.1.266.iso"
         model.loading = false
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 680),
                               styleMask: [.titled], backing: .buffered, defer: false)
@@ -191,7 +191,7 @@ enum DebugActions {
 
     static func previewContainerWizard(app: AppModel) -> NSWindow {
         let model = ContainerWizardModel(session: previewSession(app: app))
-        model.nodes = ["pve01"]
+        model.nodes = ["pve1"]
         model.rootStorages = [.init(storage: "local-lvm", type: "lvmthin", content: "rootdir,images", avail: 151_636_672_512, total: nil, active: 1)]
         model.templateStorages = [.init(storage: "local", type: "dir", content: "vztmpl,iso", avail: 50_000_000_000, total: nil, active: 1)]
         model.templates = [.init(volid: "local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst", size: nil)]
@@ -199,7 +199,7 @@ enum DebugActions {
                             .init(template: "ubuntu-24.04-standard_24.04-2_amd64.tar.zst", headline: nil, os: "ubuntu", section: "system", version: nil)]
         model.bridges = [.init(iface: "vmbr0", type: "bridge", active: 1, comments: nil)]
         model.maxCores = 12
-        model.draft.node = "pve01"
+        model.draft.node = "pve1"
         model.draft.vmid = 106
         model.draft.rootStorage = "local-lvm"
         model.draft.downloadStorage = "local"
@@ -214,23 +214,23 @@ enum DebugActions {
     static func previewLogs(app: AppModel) -> NSWindow {
         let now = Int(Date().timeIntervalSince1970)
         func t(_ type: String, _ ago: Int, _ dur: Int?, _ status: String?) -> ProxmoxClient.TaskEntry {
-            .init(upid: "UPID:pve01:\(type):\(ago)", type: type, status: status, starttime: now - ago,
-                  endtime: dur.map { now - ago + $0 }, user: "root@pam", node: "pve01")
+            .init(upid: "UPID:pve1:\(type):\(ago)", type: type, status: status, starttime: now - ago,
+                  endtime: dur.map { now - ago + $0 }, user: "root@pam", node: "pve1")
         }
         let tasks = [t("vncproxy", 30, nil, nil), t("qmstart", 120, 3, "OK"), t("qmstart", 400, 2, "start failed: QEMU exited with code 1"),
                      t("vzdump", 86_400, 412, "OK"), t("qmshutdown", 90_000, 14, "OK"), t("qmcreate", 200_000, 5, "OK")]
         let log = ["kvm: warning: host doesn't support requested feature: CPUID[eax=01h].ECX.aes [bit 25]",
                    "kvm: Host doesn't support requested features", "TASK ERROR: start failed: QEMU exited with code 1"]
-        let vm = ProxmoxVM(vmid: 100, name: "w11", node: "pve01", status: "running", type: "qemu", template: nil, maxmem: nil,
+        let vm = ProxmoxVM(vmid: 100, name: "win11-desktop", node: "pve1", status: "running", type: "qemu", template: nil, maxmem: nil,
                            maxcpu: nil, uptime: nil, cpu: nil, mem: nil, maxdisk: nil, netin: nil, netout: nil, diskread: nil, diskwrite: nil)
         return previewWindow(VMLogsView(session: previewSession(app: app), vm: vm, preview: (tasks, log)),
                              size: NSSize(width: 980, height: 620))
     }
 
     static func previewSyslog(app: AppModel) -> NSWindow {
-        let lines = (0..<40).map { i in "Nov 22 01:\(String(format: "%02d", i)):12 pve01 pvedaemon[1234]: <root@pam> successful auth for user 'root@pam'" }
-            + ["Nov 22 01:41:00 pve01 kernel: warning: something odd", "Nov 22 01:41:02 pve01 pveproxy[999]: error: connection refused"]
-        return previewWindow(NodeLogView(session: previewSession(app: app), node: "pve01", preview: lines),
+        let lines = (0..<40).map { i in "Nov 22 01:\(String(format: "%02d", i)):12 pve1 pvedaemon[1234]: <root@pam> successful auth for user 'root@pam'" }
+            + ["Nov 22 01:41:00 pve1 kernel: warning: something odd", "Nov 22 01:41:02 pve1 pveproxy[999]: error: connection refused"]
+        return previewWindow(NodeLogView(session: previewSession(app: app), node: "pve1", preview: lines),
                              size: NSSize(width: 980, height: 640))
     }
 }
