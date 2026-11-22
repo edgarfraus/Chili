@@ -241,3 +241,29 @@ public class TranslationCoverageTests
         Assert.True(missing.Count == 0, "Missing Italian strings:\n" + string.Join("\n", missing));
     }
 }
+
+public class LaunchArgumentTests
+{
+    [Fact]
+    public void SpiceUris()
+    {
+        var c = LaunchArguments.ParseSpiceUri("spice://192.168.1.10:5901?password=s%20e")!;
+        Assert.Equal("192.168.1.10", c["host"]);
+        Assert.Equal("5901", c["port"]);
+        Assert.Equal("s e", c["password"]);
+        var t = LaunchArguments.ParseSpiceUri("spice+tls://pve:61000")!;
+        Assert.Equal("61000", t["tls-port"]);
+        Assert.Null(t["port"]);
+        Assert.Equal("5900", LaunchArguments.ParseSpiceUri("spice://host")!["port"]);
+        Assert.Null(LaunchArguments.ParseSpiceUri("https://pve:8006"));
+    }
+
+    [Fact]
+    public void CommandLines()
+    {
+        var args = LaunchArguments.Split(@"""C:\Program Files\Chili\Chili.exe"" ""C:\Users\me\Downloads\pve-spice (1).vv""");
+        Assert.Equal([@"C:\Program Files\Chili\Chili.exe", @"C:\Users\me\Downloads\pve-spice (1).vv"], args);
+        Assert.Equal(@"C:\Users\me\Downloads\pve-spice (1).vv", LaunchArguments.Target(args.Skip(1)));
+        Assert.Equal("spice://h:1", LaunchArguments.Target(LaunchArguments.Split("Chili.exe spice://h:1")));
+    }
+}

@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">Chili</h1>
-<p align="center"><b>An unofficial SPICE client and Proxmox VE companion for macOS</b></p>
+<p align="center"><b>An unofficial SPICE client and Proxmox VE companion for macOS and Windows</b></p>
 
 <p align="center">
   Native SPICE consoles, noVNC and shells in one window — plus your VMs and containers at a glance,
@@ -16,6 +16,7 @@
   <a href="../../releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/edgarfraus/Chili?label=download"></a>
   <a href="../../actions/workflows/build.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/edgarfraus/Chili/build.yml?branch=main"></a>
   <img alt="macOS 12+" src="https://img.shields.io/badge/macOS-12%2B-blue">
+  <img alt="Windows 10+" src="https://img.shields.io/badge/Windows-10%2B-blue">
   <a href="LICENSE"><img alt="License: GPL-2.0-or-later" src="https://img.shields.io/badge/license-GPL--2.0--or--later-green"></a>
 </p>
 
@@ -85,6 +86,17 @@ with a click, and creates new ones.
 3. Eject the DMG and start Chili from Launchpad or Applications.
 
 Requirements: macOS 12 Monterey or later.
+
+### Windows (new)
+
+Chili for Windows is published as separate `windows-v…` releases (see [all releases](../../releases)).
+Download `Chili-<version>-x64-setup.exe` and run it: it installs for your user without administrator
+rights, adds Chili to the Start menu and opens `.vv` files and `spice://` links. The installer isn't
+code-signed yet: if Windows says *"Windows protected your PC"*, click **More info → Run anyway**.
+Requirements: Windows 10 (1809) or later, 64-bit.
+
+The Windows app has the Proxmox features described below and a built-in SPICE console; noVNC, container
+consoles and the node shell still open in the browser. Its source is in [`windows/`](windows).
 
 ## First launch
 

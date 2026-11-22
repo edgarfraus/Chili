@@ -24,6 +24,9 @@ public sealed partial class MainWindow : Window
         Consoles = new Consoles(model, this);
         InitializeComponent();
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1180, 760));
+        // The icon embedded in Chili.exe (ApplicationIcon), so no loose file is needed.
+        var icon = ExtractIconW(IntPtr.Zero, Environment.ProcessPath ?? "", 0);
+        if (icon > 1) AppWindow.SetIcon(Microsoft.UI.Win32Interop.GetIconIdFromIcon(icon));
         if (AppWindow.Presenter is OverlappedPresenter p)
         {
             p.PreferredMinimumWidth = 820;
@@ -157,6 +160,36 @@ public sealed partial class MainWindow : Window
         };
         icon.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[key];
     }
+
+    /// <summary>A .vv file or spice:// link from the command line or a file association.</summary>
+    public async Task OpenTargetAsync(string target)
+    {
+        if (target.EndsWith(".vv", StringComparison.OrdinalIgnoreCase))
+        {
+            await Consoles.OpenFileAsync(target);
+        }
+        else if (Core.LaunchArguments.ParseSpiceUri(target) is { } config)
+        {
+            await Consoles.OpenSpiceAsync(config, $"{config["host"]}:{config["port"] ?? config["tls-port"]}");
+        }
+        else
+        {
+            await ShowAlertAsync(L.T("Something went wrong"), L.F("“%@” is not a valid SPICE connection file.", target));
+        }
+    }
+
+    /// <summary>Shows the window on top (also when a second launch was redirected here).</summary>
+    public void BringToFront()
+    {
+        if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized } p) p.Restore();
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        SetForegroundWindow(hwnd);
+        Activate();
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hwnd);
+    [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern IntPtr ExtractIconW(IntPtr instance, string path, int index);
 
     public bool IsFullScreen => AppWindow.Presenter.Kind == AppWindowPresenterKind.FullScreen;
 

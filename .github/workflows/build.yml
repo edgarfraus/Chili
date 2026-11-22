@@ -4,7 +4,10 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+    # Windows-only changes are built by build-windows.yml (path filters don't apply to tags).
+    paths-ignore: ["windows/**", ".github/workflows/build-windows.yml", ".github/release-notes-windows.md"]
   pull_request:
+    paths-ignore: ["windows/**", ".github/workflows/build-windows.yml", ".github/release-notes-windows.md"]
   workflow_dispatch:
 
 permissions:

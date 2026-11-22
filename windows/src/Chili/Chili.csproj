@@ -12,12 +12,17 @@
     <UseWinUI>true</UseWinUI>
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!-- Needed for dotnet publish to include the compiled XAML (.xbf) and Chili.pri. -->
+    <EnableMsixTooling>true</EnableMsixTooling>
     <SelfContained>true</SelfContained>
     <Platforms>x64;ARM64</Platforms>
     <Platform Condition="'$(Platform)' == '' Or '$(Platform)' == 'AnyCPU'">x64</Platform>
     <RuntimeIdentifier Condition="'$(Platform)' == 'x64'">win-x64</RuntimeIdentifier>
     <RuntimeIdentifier Condition="'$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/Chili.ico</ApplicationIcon>
+    <!-- Program.cs has Main: single instance + redirection of .vv files and spice:// links. -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <Product>Chili</Product>
     <Description>SPICE client and Proxmox VE companion</Description>
     <Version>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)..\..\..\VERSION').Trim())</Version>

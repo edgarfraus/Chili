@@ -1,0 +1,124 @@
+name: Build (Windows)
+
+on:
+  push:
+    branches: [main]
+    tags: ["windows-v*"]
+    paths:
+      - "windows/**"
+      - ".github/workflows/build-windows.yml"
+      - ".github/release-notes-windows.md"
+      - "launcher/Resources/it.lproj/**"
+      - "VERSION"
+  pull_request:
+    paths:
+      - "windows/**"
+      - ".github/workflows/build-windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (x64)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      # remote-viewer, spice-glib, GTK and GStreamer come from MSYS2.
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-ntldd
+            mingw-w64-ucrt-x86_64-virt-viewer
+            mingw-w64-ucrt-x86_64-gst-plugins-good
+            mingw-w64-ucrt-x86_64-gst-plugins-bad
+
+      - name: Bundle viewer and built-in console
+        shell: msys2 {0}
+        run: windows/scripts/bundle-viewer.sh
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Unit tests
+        run: dotnet test windows/tests/Chili.Core.Tests
+
+      - name: Publish
+        run: dotnet publish windows/src/Chili/Chili.csproj -c Release -p:Platform=x64 -o windows/build/publish/x64
+
+      # The published app must start (a missing Chili.pri crashes it at launch) and render.
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          $shots = "$env:RUNNER_TEMP\shots"
+          New-Item -ItemType Directory -Force $shots | Out-Null
+          $env:CHILI_DEMO = "1"
+          $env:CHILI_DEBUG_SNAPSHOT = $shots
+          $p = Start-Process windows\build\publish\x64\Chili.exe -PassThru
+          Start-Sleep -Seconds 20
+          if ($p.HasExited) { throw "Chili exited with code $($p.ExitCode)" }
+          Stop-Process $p
+          if (-not (Test-Path "$shots\main.png")) { throw "no snapshot of the main window" }
+          if (-not (Test-Path windows\build\publish\x64\viewer\bin\chili-spice.dll)) { throw "chili-spice.dll missing" }
+
+      - name: Installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; }
+          $version = (Get-Content VERSION).Trim()
+          & $iscc /Q "/DAppVersion=$version" /DArch=x64 windows\installer\Chili.iss
+          if ($LASTEXITCODE) { throw "ISCC failed" }
+          Get-ChildItem windows\build\dist\*.exe | ForEach-Object {
+            "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $($_.Name)" |
+              Out-File "$($_.FullName).sha256" -Encoding ascii -NoNewline
+          }
+
+      # The GPL asks us to ship the corresponding source with the binaries.
+      - name: Collect sources
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: msys2 {0}
+        run: windows/scripts/collect-sources.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: windows/build/dist/*
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-test-screenshot
+          path: ${{ runner.temp }}/shots
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/windows-v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-x64
+          path: artifacts
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The macOS release stays "Latest"; this one is listed next to it.
+          gh release create "$GITHUB_REF_NAME" artifacts/* \
+            --title "Chili for Windows ${GITHUB_REF_NAME#windows-v}" \
+            --notes-file .github/release-notes-windows.md \
+            --latest=false --verify-tag

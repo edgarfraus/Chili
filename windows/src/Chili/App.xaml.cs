@@ -26,11 +26,27 @@ public partial class App : Application
         UnhandledException += (_, e) => Services.Debug.Log($"unhandled: {e.Exception}");
     }
 
+    public static new App? Current => Application.Current as App;
+
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         Model = new AppModel();
         window = new MainWindow(Model);
         Windows.Add(window);
         window.Activate();
+        HandleLaunch(Program.Arguments);
+    }
+
+    /// <summary>Opens a .vv file or spice:// link from the command line (this launch or a
+    /// redirected one). May be called from any thread.</summary>
+    public void HandleLaunch(IReadOnlyList<string> args)
+    {
+        var target = LaunchArguments.Target(args);
+        window?.DispatcherQueue.TryEnqueue(async () =>
+        {
+            if (window is null) return;
+            window.BringToFront();
+            if (target is not null) await window.OpenTargetAsync(target);
+        });
     }
 }
