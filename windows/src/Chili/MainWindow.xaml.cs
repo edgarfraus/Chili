@@ -173,6 +173,15 @@ public sealed partial class MainWindow : Window
                 await ServerView.ShowCertificatePromptAsync(this, "pve.example.lan",
                     string.Join(":", Enumerable.Range(0, 32).Select(i => (i * 37 % 256).ToString("X2"))));
                 break;
+            case var a when a.StartsWith("spice:") && int.TryParse(a[6..], out var vmid):
+                // Opens the console of a running VM on the first server (never starts one).
+                if (Detail.Content is not ServerView view) break;
+                for (int i = 0; i < 60 && view.Session.State != ServerSession.SessionState.Ready; i++) await Task.Delay(500);
+                var target = view.Session.VMs.FirstOrDefault(v => v.VmId == vmid);
+                Debug.Log($"spice: state={view.Session.State} vm={target?.DisplayName} status={target?.Status} running=[{string.Join(", ", view.Session.VMs.Where(v => v.IsRunning && !v.IsContainer).Select(v => $"{v.VmId} {v.DisplayName}"))}]");
+                if (target is { IsRunning: true }) await Consoles.ConnectAsync(view.Session, target);
+                Debug.Log("spice: launched");
+                break;
             case "alert":
                 await model.PresentAsync(new Core.Proxmox.HttpProxmoxException(0, "Parameter verification failed.\nnet0: invalid format"));
                 break;

@@ -33,4 +33,18 @@
     <ProjectReference Include="..\Chili.Core\Chili.Core.csproj" />
   </ItemGroup>
 
+  <!-- remote-viewer from MSYS2, collected by windows/scripts/bundle-viewer.sh, ships as viewer\. -->
+  <PropertyGroup>
+    <ViewerBundle>$(MSBuildThisFileDirectory)..\..\build\viewer\</ViewerBundle>
+  </PropertyGroup>
+  <!-- Plain copies, not Content items: WinUI's resource indexer would scan the .mo files. -->
+  <Target Name="CopyViewerBundle" AfterTargets="Build" Condition="Exists('$(ViewerBundle)bin\remote-viewer.exe')">
+    <ItemGroup><ViewerFile Include="$(ViewerBundle)**\*" /></ItemGroup>
+    <Copy SourceFiles="@(ViewerFile)" DestinationFolder="$(OutDir)viewer\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="PublishViewerBundle" AfterTargets="Publish" Condition="Exists('$(ViewerBundle)bin\remote-viewer.exe')">
+    <ItemGroup><ViewerFile Include="$(ViewerBundle)**\*" /></ItemGroup>
+    <Copy SourceFiles="@(ViewerFile)" DestinationFolder="$(PublishDir)viewer\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>

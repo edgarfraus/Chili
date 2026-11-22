@@ -14,10 +14,39 @@ public static class ViewerLauncher
     public static string LogDirectory { get; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chili", "Logs");
 
+    private static string BundledViewer => Path.Combine(AppContext.BaseDirectory, "viewer", "bin", "remote-viewer.exe");
+
+    /// <summary>Environment for the bundled viewer: GStreamer only loads our plugins (never a
+    /// system-wide GStreamer's), keeps its registry in our cache and needs no plugin scanner;
+    /// GTK follows the Windows dark mode and the app language.</summary>
+    private static void ConfigureBundledEnvironment(ProcessStartInfo psi)
+    {
+        var root = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(psi.FileName)!, ".."));
+        var cache = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chili", "Cache");
+        Directory.CreateDirectory(cache);
+        var env = psi.Environment;
+        var plugins = Path.Combine(root, "lib", "gstreamer-1.0");
+        env["GST_PLUGIN_SYSTEM_PATH_1_0"] = plugins;
+        env["GST_PLUGIN_PATH_1_0"] = plugins;
+        env["GST_REGISTRY_1_0"] = Path.Combine(cache, $"gst-registry-{System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}.bin".ToLowerInvariant());
+        env["GST_REGISTRY_FORK"] = "no";
+        env["XDG_CACHE_HOME"] = cache;
+        env["GSETTINGS_BACKEND"] = "memory";
+        if (!env.ContainsKey("LANG"))
+            env["LANG"] = System.Globalization.CultureInfo.CurrentUICulture.Name.Replace('-', '_') is { Length: > 0 } lang ? lang : "en_US";
+        if (WindowsUsesDarkMode()) env["GTK_THEME"] = "Adwaita:dark";
+    }
+
+    private static bool WindowsUsesDarkMode()
+    {
+        using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+        return key?.GetValue("AppsUseLightTheme") is int light && light == 0;
+    }
+
     /// <summary>The bundled viewer (viewer\bin next to Chili.exe), else an installed virt-viewer.</summary>
     public static string? FindViewer()
     {
-        var candidates = new List<string> { Path.Combine(AppContext.BaseDirectory, "viewer", "bin", "remote-viewer.exe") };
+        var candidates = new List<string> { BundledViewer };
         foreach (var root in new[] { Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
                                      Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86) })
         {
@@ -57,8 +86,9 @@ public static class ViewerLauncher
             RedirectStandardError = true,
             CreateNoWindow = true,
         };
-        if (App.Model.Settings.Preferences.ViewerDebugLog) { psi.ArgumentList.Add("--debug"); psi.ArgumentList.Add("--spice-debug"); }
+        if (App.Model.Settings.Preferences.ViewerDebugLog || Environment.GetEnvironmentVariable("CHILI_VIEWER_DEBUG") is { Length: > 0 }) { psi.ArgumentList.Add("--debug"); psi.ArgumentList.Add("--spice-debug"); }
         foreach (var a in arguments) psi.ArgumentList.Add(a);
+        if (string.Equals(exe, BundledViewer, StringComparison.OrdinalIgnoreCase)) ConfigureBundledEnvironment(psi);
 
         var log = new StreamWriter(logPath, append: false, Encoding.UTF8) { AutoFlush = true };
         var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
