@@ -252,3 +252,75 @@
 "This powers the VM off immediately, like pulling the plug. Unsaved data in the VM is lost." = "La VM viene spenta subito, come staccare la spina. I dati non salvati nella VM vanno persi.";
 "Delete %@ (%@)?" = "Eliminare %@ (%@)?";
 "The VM and all its disks are permanently deleted from Proxmox. This can't be undone." = "La VM e tutti i suoi dischi vengono eliminati definitivamente da Proxmox. L'operazione non si può annullare.";
+
+/* Containers */
+"New" = "Nuovo";
+"Create a virtual machine or a container" = "Crea una macchina virtuale o un container";
+"New Virtual Machine…" = "Nuova macchina virtuale…";
+"New Container…" = "Nuovo container…";
+"New Container" = "Nuovo container";
+"An LXC container shares the node's Linux kernel: it starts in seconds and uses little memory. Chili creates it unprivileged, with nesting enabled, and opens its console when it's ready." = "Un container LXC condivide il kernel Linux del nodo: parte in pochi secondi e usa poca memoria. Chili lo crea non privilegiato, con il nesting attivo, e ne apre la console quando è pronto.";
+"Hostname" = "Hostname";
+"Template" = "Template";
+"On the server" = "Sul server";
+"Download from Proxmox" = "Scarica da Proxmox";
+"Save template to" = "Salva il template in";
+"Root password" = "Password di root";
+"Confirm password" = "Conferma password";
+"SSH public key" = "Chiave SSH pubblica";
+"IPv4" = "IPv4";
+"IPv6" = "IPv6";
+"DHCP" = "DHCP";
+"Static" = "Statico";
+"SLAAC" = "SLAAC";
+"Address" = "Indirizzo";
+"Gateway" = "Gateway";
+"Advanced" = "Avanzate";
+"Container ID" = "ID container";
+"Swap" = "Swap";
+"Unprivileged container" = "Container non privilegiato";
+"Nesting (needed by systemd and Docker)" = "Nesting (serve a systemd e Docker)";
+"Start the container and open its console" = "Avvia il container e apri la console";
+"Choose a template." = "Scegli un template.";
+"Set a root password or an SSH key." = "Imposta una password di root o una chiave SSH.";
+"The password must be at least 5 characters." = "La password deve avere almeno 5 caratteri.";
+"The passwords don't match." = "Le password non coincidono.";
+"Write the IPv4 address with its prefix, e.g. 192.168.1.50/24." = "Scrivi l'indirizzo IPv4 con il prefisso, per esempio 192.168.1.50/24.";
+"Downloading %@…" = "Download di %@…";
+"Creating the container…" = "Creazione del container…";
+"Starting the container…" = "Avvio del container…";
+
+/* Logs */
+"Node" = "Nodo";
+"Shell and system log of a node" = "Shell e log di sistema di un nodo";
+"System Log" = "Log di sistema";
+"History & Logs…" = "Cronologia e log…";
+"History & Logs" = "Cronologia e log";
+"No tasks recorded for this machine yet." = "Nessuna operazione registrata per questa macchina.";
+"Select a task to see its log." = "Seleziona un'operazione per vederne il log.";
+"Follow" = "Segui";
+
+/* Task types */
+"Start" = "Avvia";
+"Shut down" = "Arresto";
+"Reset" = "Reset";
+"Suspend" = "Sospensione";
+"Resume" = "Ripresa";
+"Clone" = "Clonazione";
+"Migrate" = "Migrazione";
+"Backup" = "Backup";
+"Restore" = "Ripristino";
+"Snapshot" = "Snapshot";
+"Delete snapshot" = "Eliminazione snapshot";
+"Rollback" = "Rollback";
+"Move disk" = "Spostamento disco";
+"Move volume" = "Spostamento volume";
+"Resize disk" = "Ridimensionamento disco";
+"Convert to template" = "Conversione in template";
+"Change configuration" = "Modifica configurazione";
+"Console (noVNC)" = "Console (noVNC)";
+"Console (xterm.js)" = "Console (xterm.js)";
+"Console (SPICE)" = "Console (SPICE)";
+"Shell (SPICE)" = "Shell (SPICE)";
+"Copy image" = "Copia immagine";
+"Download" = "Download";

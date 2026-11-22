@@ -37,7 +37,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NotificationCenter.default.addObserver(forName: .consolesChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.quitIfIdle() }
         }
-        let layoutPreview = ProcessInfo.processInfo.environment["CHILI_DEBUG_ACTION"]?.hasPrefix("wizard") == true
+        let layoutPreview = ["wizard", "ctwizard", "logs", "syslog"].contains {
+            ProcessInfo.processInfo.environment["CHILI_DEBUG_ACTION"]?.hasPrefix($0) == true
+        }
         if !openedDocumentsAtLaunch && !layoutPreview { showMainWindow() }
         startDebugSnapshotsIfRequested()
     }
@@ -89,6 +91,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func runDebugAction(_ action: String) {
+        switch action {   // layout previews with sample data, no server needed
+        case "ctwizard": debugWindows.append(DebugActions.previewContainerWizard(app: model)); return
+        case "logs": debugWindows.append(DebugActions.previewLogs(app: model)); return
+        case "syslog": debugWindows.append(DebugActions.previewSyslog(app: model)); return
+        default: break
+        }
         if action.hasPrefix("wizard") {   // layout preview, no server needed
             let custom = action.contains("custom")
             let os: VMDraft.OS = action.contains("win") ? .win11 : .linux
@@ -151,6 +159,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case "create": whenReady { await DebugActions.createTest(session, variant: parts.count > 1 ? parts[1] : "linux",
                                                                   keep: parts.contains("keep")) }
         case "cleanup": whenReady { await DebugActions.cleanup(session) }
+        case "ctcreate": whenReady { await DebugActions.containerTest(session) }
+        case "journal": whenReady {
+            let node = session.vms.first?.node ?? "pve01"
+            do {
+                let lines = try await session.api.syslog(node: node, lines: 20)
+                DebugActions.log("journal \(lines.count) lines; last: \(lines.suffix(2))")
+            } catch { DebugActions.log("journal failed: \(error.localizedDescription)") }
+        }
         case "tasklog": whenReady {
             if let vm = session.vms.first(where: { String($0.vmid) == parts[1] }) {
                 do { for l in try await session.api.lastTaskLog(vm) { DebugActions.log("task: \(l)") } }

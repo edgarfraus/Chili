@@ -86,7 +86,8 @@ enum DebugActions {
 
     static func deleteVM(_ session: ServerSession, _ vm: ProxmoxVM) async {
         // Check the name in the VM's own config: the cluster list can lag behind.
-        let name = (try? await session.api.vmConfig(vm))?["name"] ?? vm.displayName
+        let config = try? await session.api.vmConfig(vm)
+        let name = config?["name"] ?? config?["hostname"] ?? vm.displayName   // containers use "hostname"
         guard name.hasPrefix("chili-test-") else { return log("refusing to delete \(vm.vmid) (\(name))") }
         do {
             if let current = session.vms.first(where: { $0.id == vm.id }), current.isRunning {
@@ -99,6 +100,41 @@ enum DebugActions {
             log("deleted \(vm.vmid)")
         } catch {
             log("delete failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Creates chili-test-ct with the container wizard (downloading Alpine if no
+    /// template is present), starts it into its console, then checks the logs APIs.
+    static func containerTest(_ session: ServerSession) async {
+        let model = ContainerWizardModel(session: session)
+        await model.load()
+        log("ct templates on server: \(model.templates.map(\.fileName)); rootdir storages: \(model.rootStorages.map(\.storage)); vztmpl storages: \(model.templateStorages.map(\.storage)); catalogue: \(model.appliances.count)")
+        if let alpine = model.templates.first(where: { $0.fileName.hasPrefix("alpine") }) {
+            model.draft.template = alpine.volid
+        } else if let alpine = model.appliances.last(where: { $0.template.hasPrefix("alpine") }) {
+            model.draft.template = ContainerDraft.downloadPrefix + alpine.template
+        }
+        model.draft.hostname = "chili-test-ct"
+        model.draft.password = UUID().uuidString
+        model.draft.passwordConfirm = model.draft.password
+        model.draft.memoryMiB = 256
+        model.draft.rootSizeGB = 2
+        model.draft.startAfterCreate = true
+        log("ct params: \(model.draft.parameters(ostemplate: model.draft.template).filter { $0.key != "password" }.sorted { $0.key < $1.key })")
+        log("ct problems: \(model.draft.problems)")
+        let ok = await model.create()
+        log("ct create: \(ok ? "OK" : "FAILED: \(model.error ?? "?")")")
+        guard ok, let ct = session.vms.first(where: { $0.vmid == model.draft.vmid }) else { return }
+        await printConfig(session, ct)
+        try? await Task.sleep(nanoseconds: 8_000_000_000)
+        if let tasks = try? await session.api.tasks(for: ct) {
+            log("ct tasks: \(tasks.map { "\($0.type)=\($0.status ?? "running")" })")
+            if let first = tasks.first, let lines = try? await session.api.taskLog(node: ct.node, upid: first.upid) {
+                log("ct last task log: \(lines.suffix(3))")
+            }
+        }
+        if let sys = try? await session.api.syslog(node: ct.node, lines: 50) {
+            log("syslog lines: \(sys.count), last: \(sys.last ?? "-")")
         }
     }
 
@@ -139,5 +175,61 @@ enum DebugActions {
         window.center()
         window.makeKeyAndOrderFront(nil)
         return window
+    }
+
+    static func previewWindow<V: View>(_ view: V, size: NSSize) -> NSWindow {
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentView = NSHostingView(rootView: view)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        return window
+    }
+
+    static func previewSession(app: AppModel) -> ServerSession {
+        ServerSession(profile: ServerProfile(name: "Preview", host: "preview.invalid"), app: app)
+    }
+
+    static func previewContainerWizard(app: AppModel) -> NSWindow {
+        let model = ContainerWizardModel(session: previewSession(app: app))
+        model.nodes = ["pve01"]
+        model.rootStorages = [.init(storage: "local-lvm", type: "lvmthin", content: "rootdir,images", avail: 151_636_672_512, total: nil, active: 1)]
+        model.templateStorages = [.init(storage: "local", type: "dir", content: "vztmpl,iso", avail: 50_000_000_000, total: nil, active: 1)]
+        model.templates = [.init(volid: "local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst", size: nil)]
+        model.appliances = [.init(template: "alpine-3.22-default_20250617_amd64.tar.xz", headline: nil, os: "alpine", section: "system", version: nil),
+                            .init(template: "ubuntu-24.04-standard_24.04-2_amd64.tar.zst", headline: nil, os: "ubuntu", section: "system", version: nil)]
+        model.bridges = [.init(iface: "vmbr0", type: "bridge", active: 1, comments: nil)]
+        model.maxCores = 12
+        model.draft.node = "pve01"
+        model.draft.vmid = 106
+        model.draft.rootStorage = "local-lvm"
+        model.draft.downloadStorage = "local"
+        model.draft.bridge = "vmbr0"
+        model.draft.template = "local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst"
+        model.draft.ipv4 = .staticIP
+        model.loading = false
+        return previewWindow(ContainerWizardView(model: model), size: NSSize(width: 640, height: 680))
+    }
+
+    static func previewLogs(app: AppModel) -> NSWindow {
+        let now = Int(Date().timeIntervalSince1970)
+        func t(_ type: String, _ ago: Int, _ dur: Int?, _ status: String?) -> ProxmoxClient.TaskEntry {
+            .init(upid: "UPID:pve01:\(type):\(ago)", type: type, status: status, starttime: now - ago,
+                  endtime: dur.map { now - ago + $0 }, user: "root@pam", node: "pve01")
+        }
+        let tasks = [t("vncproxy", 30, nil, nil), t("qmstart", 120, 3, "OK"), t("qmstart", 400, 2, "start failed: QEMU exited with code 1"),
+                     t("vzdump", 86_400, 412, "OK"), t("qmshutdown", 90_000, 14, "OK"), t("qmcreate", 200_000, 5, "OK")]
+        let log = ["kvm: warning: host doesn't support requested feature: CPUID[eax=01h].ECX.aes [bit 25]",
+                   "kvm: Host doesn't support requested features", "TASK ERROR: start failed: QEMU exited with code 1"]
+        let vm = ProxmoxVM(vmid: 100, name: "w11", node: "pve01", status: "running", type: "qemu", template: nil, maxmem: nil,
+                           maxcpu: nil, uptime: nil, cpu: nil, mem: nil, maxdisk: nil, netin: nil, netout: nil, diskread: nil, diskwrite: nil)
+        return previewWindow(VMLogsView(session: previewSession(app: app), vm: vm, preview: (tasks, log)),
+                             size: NSSize(width: 980, height: 620))
+    }
+
+    static func previewSyslog(app: AppModel) -> NSWindow {
+        let lines = (0..<40).map { i in "Nov 22 01:\(String(format: "%02d", i)):12 pve01 pvedaemon[1234]: <root@pam> successful auth for user 'root@pam'" }
+            + ["Nov 22 01:41:00 pve01 kernel: warning: something odd", "Nov 22 01:41:02 pve01 pveproxy[999]: error: connection refused"]
+        return previewWindow(NodeLogView(session: previewSession(app: app), node: "pve01", preview: lines),
+                             size: NSSize(width: 980, height: 640))
     }
 }

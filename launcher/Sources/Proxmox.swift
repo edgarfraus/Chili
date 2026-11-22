@@ -273,6 +273,76 @@ final class ProxmoxClient: NSObject, URLSessionDelegate {
         try await request("DELETE", "/api2/json/nodes/\(vm.node)/\(vm.type)/\(vm.vmid)?purge=1&destroy-unreferenced-disks=1")
     }
 
+    // MARK: History and logs
+
+    struct TaskEntry: Decodable, Identifiable, Hashable {
+        let upid: String
+        let type: String
+        let status: String?        // "OK", an error, or nil while running
+        let starttime: Int
+        let endtime: Int?
+        let user: String?
+        let node: String
+        var id: String { upid }
+        var isRunning: Bool { endtime == nil }
+        var succeeded: Bool { status == "OK" }
+        var startDate: Date { Date(timeIntervalSince1970: TimeInterval(starttime)) }
+        var duration: TimeInterval? { endtime.map { TimeInterval($0 - starttime) } }
+    }
+
+    /// Proxmox' task history for one VM or container, newest first.
+    func tasks(for vm: ProxmoxVM, limit: Int = 100) async throws -> [TaskEntry] {
+        let list: [TaskEntry] = try await request("GET", "/api2/json/nodes/\(vm.node)/tasks?vmid=\(vm.vmid)&limit=\(limit)&source=all")
+        return list.sorted { $0.starttime > $1.starttime }
+    }
+
+    func taskLog(node: String, upid: String) async throws -> [String] {
+        struct Line: Decodable { let t: String }
+        let escaped = upid.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? upid
+        let lines: [Line] = try await request("GET", "/api2/json/nodes/\(node)/tasks/\(escaped)/log?limit=5000")
+        return lines.map(\.t)
+    }
+
+    /// The latest entries of the node's system journal (newest last).
+    /// (/syslog pages from the oldest entry; /journal?lastentries gives the tail.)
+    func syslog(node: String, lines: Int = 1000) async throws -> [String] {
+        let list: [String] = try await request("GET", "/api2/json/nodes/\(node)/journal?lastentries=\(lines)")
+        // Drop journalctl's cursor lines ("s=…;i=…;b=…") and "-- …" markers.
+        return list.filter { !$0.hasPrefix("-- ") && !($0.hasPrefix("s=") && $0.contains(";i=") && $0.contains(";b=")) }
+    }
+
+    // MARK: Containers
+
+    /// Container templates already on a storage (volids like "local:vztmpl/debian-12-standard_….tar.zst").
+    func containerTemplates(node: String, storage: String) async throws -> [StorageItem] {
+        let list: [StorageItem] = try await request("GET", "/api2/json/nodes/\(node)/storage/\(storage)/content?content=vztmpl")
+        return list.sorted { $0.fileName.localizedCaseInsensitiveCompare($1.fileName) == .orderedAscending }
+    }
+
+    struct Appliance: Decodable, Hashable, Identifiable {
+        let template: String
+        let headline: String?
+        let os: String?
+        let section: String?
+        let version: String?
+        var id: String { template }
+    }
+
+    /// Proxmox' catalogue of downloadable container templates.
+    func appliances(node: String) async throws -> [Appliance] {
+        let list: [Appliance] = try await request("GET", "/api2/json/nodes/\(node)/aplinfo")
+        return list.filter { $0.section == "system" }.sorted { $0.template < $1.template }
+    }
+
+    func downloadTemplate(node: String, storage: String, template: String) async throws -> String {
+        try await request("POST", "/api2/json/nodes/\(node)/aplinfo", form: ["storage": storage, "template": template])
+    }
+
+    /// Creates an LXC container; returns the task id.
+    func createContainer(node: String, parameters: [String: String]) async throws -> String {
+        try await request("POST", "/api2/json/nodes/\(node)/lxc", form: parameters)
+    }
+
     /// Log of the most recent task for a VM (for diagnostics).
     func lastTaskLog(_ vm: ProxmoxVM) async throws -> [String] {
         struct TaskEntry: Decodable { let upid: String }

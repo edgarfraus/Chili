@@ -53,7 +53,7 @@ piccola interfaccia nativa che parla con Proxmox VE al posto tuo.
   Proxmox, i container LXC la sua console xterm.js, e il menu **Shell** nella barra apre una shell su
   qualsiasi nodo, tutto nelle stesse schede. (Queste console web richiedono l'accesso con password, non un
   token API.)
-- **Crea e gestisci le VM senza l'interfaccia web.** Un assistente *Nuova VM* con due modalità,
+- **Crea e gestisci VM e container senza l'interfaccia web.** Un assistente *Nuova VM* con due modalità,
   *Consigliata per Chili* (solo l'essenziale, il resto impostato per la migliore esperienza in console) e
   *Personalizzata* (tutte le opzioni, come in Proxmox), più arresta, riavvia, ferma ed elimina dal menu
   di ogni VM.
@@ -176,6 +176,23 @@ Fai clic su **Nuova VM** nella barra del server.
 
 Il menu **…** di ogni VM ha anche **Arresta**, **Riavvia**, **Ferma** ed **Elimina** (entrambe chiedono
 conferma).
+
+### Creare un container
+
+**Nuovo → Nuovo container…** crea un container LXC: hostname, template, password di root e/o chiave SSH,
+CPU, memoria, disco, rete (DHCP o statica). Chili lo crea non privilegiato con il nesting attivo (quello
+che serve a systemd e a Docker) e ne apre la console quando è pronto. L'elenco dei template mostra quelli
+già presenti negli storage e, sotto *Scarica da Proxmox*, il catalogo ufficiale: scegline uno e Chili lo
+scarica prima di creare il container. Altre opzioni (ID, swap, IPv6, privilegiato, avvio all'accensione)
+sono in *Avanzate*.
+
+### Cronologia e log
+
+- **… → Cronologia e log…** su qualsiasi VM o container elenca le operazioni che Proxmox ha eseguito
+  (avvii, arresti, backup, migrazioni, sessioni di console…) con esito, utente e durata; selezionane una
+  per leggerne il log completo. Le operazioni in corso si aggiornano in tempo reale.
+- **Nodo → Log di sistema** nella barra del server mostra il journal del nodo, con filtro e aggiornamento
+  automatico. Lo stesso menu apre una **Shell** sul nodo.
 
 ### Usare un token API invece della password (consigliato)
 

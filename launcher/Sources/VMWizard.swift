@@ -201,7 +201,7 @@ struct VMWizardView: View {
 
 /// One form row: right-aligned label column, control on the right. (SwiftUI's
 /// Form inside a ScrollView has no width on macOS and lays out off-screen.)
-private struct Row<Content: View>: View {
+struct Row<Content: View>: View {
     let label: LocalizedStringKey?
     @ViewBuilder let content: Content
 
@@ -222,7 +222,7 @@ private struct Row<Content: View>: View {
     }
 }
 
-private struct SectionBox<Content: View>: View {
+struct SectionBox<Content: View>: View {
     let title: LocalizedStringKey
     @ViewBuilder let content: Content
 
@@ -278,7 +278,7 @@ private struct ISOPicker: View {
     }
 }
 
-private struct StoragePicker: View {
+struct StoragePicker: View {
     let title: LocalizedStringKey
     let storages: [ProxmoxClient.Storage]
     @Binding var selection: String
@@ -302,7 +302,7 @@ private struct StoragePicker: View {
     }
 }
 
-private struct BridgePicker: View {
+struct BridgePicker: View {
     let bridges: [ProxmoxClient.NetworkInterface]
     @Binding var selection: String
 
@@ -320,7 +320,7 @@ private struct BridgePicker: View {
     }
 }
 
-private struct ChoiceRow<T: Hashable, Item: Identifiable>: View {
+struct ChoiceRow<T: Hashable, Item: Identifiable>: View {
     let title: LocalizedStringKey
     let items: [Item]
     @Binding var selection: T
@@ -339,9 +339,9 @@ private struct ChoiceRow<T: Hashable, Item: Identifiable>: View {
     }
 }
 
-private struct StringChoice: Identifiable { let value: String; var id: String { value } }
+struct StringChoice: Identifiable { let value: String; var id: String { value } }
 
-private struct NumberField: View {
+struct NumberField: View {
     let title: LocalizedStringKey
     @Binding var value: Int
     let range: ClosedRange<Int>
@@ -362,7 +362,7 @@ private struct NumberField: View {
     }
 }
 
-private struct CheckRow: View {
+struct CheckRow: View {
     let title: LocalizedStringKey
     @Binding var isOn: Bool
 

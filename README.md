@@ -50,7 +50,7 @@ that talks to Proxmox VE for you.
 - **noVNC, containers and node shells too.** VMs without SPICE automatically open Proxmox' own noVNC
   console, LXC containers its xterm.js console, and the toolbar's **Shell** menu opens a shell on any node —
   all in the same tabs. (These web consoles need a password login, not an API token.)
-- **Create and manage VMs without the web UI.** A *New VM* wizard with two modes — *Recommended for
+- **Create and manage VMs and containers without the web UI.** A *New VM* wizard with two modes — *Recommended for
   Chili* (just the essentials, everything else set up for the best console experience) and *Custom*
   (every option, as in Proxmox) — plus shut down, reboot, stop and delete from each VM's menu.
 - **Opens `.vv` files.** The files that the Proxmox web UI downloads (*Console → SPICE*), or that oVirt
@@ -161,6 +161,22 @@ Click **New VM** in the server's toolbar.
 - With **Start the VM and open its console** ticked, the new VM boots straight into a console tab.
 
 Each VM's **…** menu also has **Shut Down**, **Reboot**, **Stop** and **Delete** (both ask first).
+
+### Creating a container
+
+**New → New Container…** creates an LXC container: hostname, template, root password and/or SSH key,
+CPU, memory, disk, network (DHCP or static). Chili makes it unprivileged with nesting enabled (what
+systemd-based distributions and Docker need) and opens its console when it's up. The template list shows
+those already on your storages and, under *Download from Proxmox*, the official catalogue: pick one and
+Chili downloads it first. More options (ID, swap, IPv6, privileged, start at boot) are under *Advanced*.
+
+### History and logs
+
+- **… → History & Logs…** on any VM or container lists the tasks Proxmox ran for it (start, stop,
+  backups, migrations, console sessions…) with result, user and duration; select one to read its full log.
+  Running tasks update live.
+- **Node → System Log** in the server toolbar shows the node's journal, with a filter and live follow.
+  The same menu opens a **Shell** on the node.
 
 ### Using an API token instead of a password (recommended)
 

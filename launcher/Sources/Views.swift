@@ -140,6 +140,8 @@ struct ServerDetailView: View {
     @EnvironmentObject var model: AppModel
     @ObservedObject var session: ServerSession
     @State private var showWizard = false
+    @State private var showContainerWizard = false
+    @State private var logNode: String?
 
     var body: some View {
         Group {
@@ -157,9 +159,14 @@ struct ServerDetailView: View {
         .toolbar {
             ToolbarItemGroup {
                 if session.state == .ready {
-                    Button { showWizard = true } label: { Label("New VM", systemImage: "plus.rectangle.on.rectangle") }
-                        .help("Create a new virtual machine")
-                    NodeShellMenu(session: session)
+                    Menu {
+                        Button("New Virtual Machine…") { showWizard = true }
+                        Button("New Container…") { showContainerWizard = true }
+                    } label: {
+                        Label("New", systemImage: "plus.rectangle.on.rectangle")
+                    }
+                    .help("Create a virtual machine or a container")
+                    NodeMenu(session: session, logNode: $logNode)
                     Button { session.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
                         .help("Refresh the VM list")
                     Button { session.logout() } label: { Label("Log Out", systemImage: "rectangle.portrait.and.arrow.right") }
@@ -171,6 +178,11 @@ struct ServerDetailView: View {
         }
         .onAppear { session.connectWithStoredSecret() }
         .sheet(isPresented: $showWizard) { VMWizardView(session: session) }
+        .background(EmptyView().sheet(isPresented: $showContainerWizard) { ContainerWizardView(session: session) })
+        .background(EmptyView().sheet(item: Binding(get: { logNode.map(NodeName.init) },
+                                                    set: { logNode = $0?.name })) { n in
+            NodeLogView(session: session, node: n.name)
+        })
         .alert(item: Binding(get: { session.pendingCertificate.map { CertPrompt(fingerprint: $0) } },
                              set: { if $0 == nil { session.pendingCertificate = nil } })) { prompt in
             Alert(title: Text("Untrusted certificate"),
@@ -181,20 +193,26 @@ struct ServerDetailView: View {
     }
 }
 
-/// Toolbar menu: open a root shell on one of the cluster's nodes (xterm.js).
-private struct NodeShellMenu: View {
+private struct NodeName: Identifiable { let name: String; var id: String { name } }
+
+/// Toolbar menu per node: root shell (xterm.js) and system log.
+private struct NodeMenu: View {
     @ObservedObject var session: ServerSession
+    @Binding var logNode: String?
     @State private var nodes: [String] = []
 
     var body: some View {
         Menu {
             ForEach(nodes, id: \.self) { node in
-                Button(node) { session.openWebConsole(.nodeShell(node)) }
+                Section(header: Text(verbatim: node)) {
+                    Button("Shell") { session.openWebConsole(.nodeShell(node)) }
+                    Button("System Log") { logNode = node }
+                }
             }
         } label: {
-            Label("Shell", systemImage: "terminal")
+            Label("Node", systemImage: "terminal")
         }
-        .help("Open a shell on a node")
+        .help("Shell and system log of a node")
         .task { nodes = await session.loadNodes() }
     }
 }
@@ -312,6 +330,7 @@ private struct VMRow: View {
 
     private enum Confirm: Identifiable { case stop, delete; var id: Int { self == .stop ? 0 : 1 } }
     @State private var confirm: Confirm?
+    @State private var showLogs = false
 
     private func connect() { session.connect(vm) }
     private func start() { session.start(vm) }
@@ -357,6 +376,8 @@ private struct VMRow: View {
                         Button("Start") { start() }
                     }
                     Divider()
+                    Button("History & Logs…") { showLogs = true }
+                    Divider()
                     Button("Delete…") { confirm = .delete }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -369,6 +390,7 @@ private struct VMRow: View {
         .padding(.vertical, 4)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { if !busy { connect() } }
+        .sheet(isPresented: $showLogs) { VMLogsView(session: session, vm: vm) }
         .alert(item: $confirm) { which in
             switch which {
             case .stop:
