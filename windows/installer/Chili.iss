@@ -13,12 +13,16 @@
 #ifndef SourceDir
   #define SourceDir "..\build\publish\" + Arch
 #endif
+; Test installs must pass another id (/DAppIdGuid=...) or uninstalling them drops the real install's entry.
+#ifndef AppIdGuid
+  #define AppIdGuid "{{6B3E9C1E-4C8A-4B7E-9E61-3F0C2D7A5C11}"
+#endif
 #ifndef OutputDir
   #define OutputDir "..\build\dist"
 #endif
 
 [Setup]
-AppId={{6B3E9C1E-4C8A-4B7E-9E61-3F0C2D7A5C11}
+AppId={#AppIdGuid}
 AppName=Chili
 AppVersion={#AppVersion}
 AppVerName=Chili {#AppVersion}

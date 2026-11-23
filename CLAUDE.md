@@ -73,6 +73,9 @@ see `MainWindow.RunDebugAction` and `DebugActions.cs`).
   smoke test, Inno Setup installer `windows/installer/Chili.iss`, MSYS2 source packages) → a release that
   is not marked Latest (macOS keeps it). First one: `windows-v1.0.0`. Single instance + `.vv` / `spice://`
   associations work; the installer is per user, unsigned (SmartScreen: More info → Run anyway).
+  Test installs on the maintainer's PC: pass `/DAppIdGuid={{<another guid>}` to ISCC, or uninstalling the
+  test copy removes the real install's uninstall entry (happened once, 2026-11-23). Auto-update: Chili
+  checks GitHub releases (`windows-v*`), verifies the `.sha256`, runs the setup with `/CHILIRESTART=1`.
 - Windows, next: WebView2 for noVNC/xterm.js/node shell (opened in the browser for now), settings page
   (classic viewer, resize guest, clipboard…; now only in settings.json), Windows key / Alt+Tab capture
   (keyboard hook), arm64 build (MSYS2 CLANGARM64), code signing.
