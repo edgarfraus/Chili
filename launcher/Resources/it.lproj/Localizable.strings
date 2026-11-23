@@ -324,3 +324,23 @@
 "Shell (SPICE)" = "Shell (SPICE)";
 "Copy image" = "Copia immagine";
 "Download" = "Download";
+
+/* Cloudflare Tunnel */
+"SPICE tunnel" = "Tunnel SPICE";
+"Cloudflare Tunnel (%@): %@" = "Tunnel Cloudflare (%@): %@";
+"Only if Proxmox is reachable through a Cloudflare Tunnel: the hostname of the tunnel's TCP service for spiceproxy (service: tcp://localhost:3128). Leave empty otherwise." = "Solo se Proxmox è raggiungibile tramite un Cloudflare Tunnel: il nome host del servizio TCP del tunnel per lo spiceproxy (service: tcp://localhost:3128). Altrimenti lascialo vuoto.";
+
+/* Updates */
+"Chili %@ is available" = "È disponibile Chili %@";
+"You have version %@." = "Hai la versione %@.";
+"Update Now" = "Aggiorna ora";
+"What's New" = "Novità";
+"Update Chili now?" = "Aggiornare Chili adesso?";
+"Chili closes while the update installs, and reopens afterwards. Open consoles are disconnected." = "Chili si chiude durante l'installazione dell'aggiornamento e poi si riapre. Le console aperte vengono disconnesse.";
+"Downloading the update…" = "Download dell'aggiornamento…";
+"Installing…" = "Installazione…";
+"Downloaded and verified: %@" = "Scaricato e verificato: %@";
+"The downloaded update is damaged (checksum mismatch). Try again later." = "L'aggiornamento scaricato è danneggiato (checksum non corrispondente). Riprova più tardi.";
+"Check for updates automatically" = "Controlla automaticamente gli aggiornamenti";
+"Chili can't replace itself in this folder. Drag Chili from the disk image that just opened to your Applications folder." = "Chili non può sostituirsi in questa cartella. Trascina Chili dall'immagine disco appena aperta nella cartella Applicazioni.";
+"The connection timed out." = "Tempo scaduto per la connessione.";

@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             ProcessInfo.processInfo.environment["CHILI_DEBUG_ACTION"]?.hasPrefix($0) == true
         }
         if !openedDocumentsAtLaunch && !layoutPreview { showMainWindow() }
+        model.updater.start()
         startDebugSnapshotsIfRequested()
     }
 
@@ -104,6 +105,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         if action == "dump" { dumpMainWindow(); return }
+        if action == "editor" { model.editingProfile = model.profiles.profiles.first ?? ServerProfile(); return }
+        if action == "settings" { showSettings(); return }
+        if action == "update" {   // check GitHub now, then Update Now (with CHILI_DEBUG_UPDATE_CURRENT=0.9.0)
+            Task {
+                await model.updater.check()
+                if model.updater.pending != nil { model.updater.updateNow(model: model, confirm: false) }
+            }
+            return
+        }
         if action == "quickdump" {
             model.selection = .quickConnect
             Timer.scheduledTimer(withTimeInterval: 3, repeats: false) { [weak self] _ in
@@ -175,6 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         case "novnc": if let vm { session.openWebConsole(.vm(vm)) }
         case "spice": if let vm { session.connect(vm) }
+        case "spicetunnel": whenReady { await DebugActions.spiceTunnel(app: self.model, real: session, vmid: parts.count > 1 ? parts[1] : "") }
         case "shell": if let node = session.vms.first?.node { session.openWebConsole(.nodeShell(node)) }
         default: break
         }

@@ -17,9 +17,30 @@ struct ServerProfile: Identifiable, Codable, Hashable {
     var realm = "pam"
     var tokenID = ""            // "user@realm!name"
     var rememberSecret = true
+    /// Hostname of a Cloudflare Tunnel TCP service for spiceproxy (port 3128), when the server is only
+    /// reachable through the tunnel. Empty: SPICE goes to host:3128 directly.
+    var spiceTunnelHost = ""
 
     var title: String { name.isEmpty ? host : name }
     var fullUsername: String { username.contains("@") ? username : "\(username)@\(realm)" }
+}
+
+extension ServerProfile {
+    /// Profiles saved by older versions lack the newer keys: use the defaults.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = ServerProfile()
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? d.id
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? d.name
+        host = try c.decodeIfPresent(String.self, forKey: .host) ?? d.host
+        port = try c.decodeIfPresent(Int.self, forKey: .port) ?? d.port
+        authMethod = try c.decodeIfPresent(AuthMethod.self, forKey: .authMethod) ?? d.authMethod
+        username = try c.decodeIfPresent(String.self, forKey: .username) ?? d.username
+        realm = try c.decodeIfPresent(String.self, forKey: .realm) ?? d.realm
+        tokenID = try c.decodeIfPresent(String.self, forKey: .tokenID) ?? d.tokenID
+        rememberSecret = try c.decodeIfPresent(Bool.self, forKey: .rememberSecret) ?? d.rememberSecret
+        spiceTunnelHost = try c.decodeIfPresent(String.self, forKey: .spiceTunnelHost) ?? d.spiceTunnelHost
+    }
 }
 
 final class ProfileStore: ObservableObject {

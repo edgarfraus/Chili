@@ -121,6 +121,13 @@ When Chili first reads a saved password, macOS asks to allow access to the Keych
 You can check that the DMG you downloaded is the one built by GitHub Actions: each release lists the
 SHA-256 of every DMG (`shasum -a 256 Chili-*.dmg`).
 
+### Updates
+
+Chili checks GitHub for a new release shortly after launch and every 12 hours, and shows a banner when one
+is out. **Update Now** downloads it, checks its SHA-256, replaces Chili and reopens it (open consoles are
+disconnected; Chili asks first). If Chili can't write to the folder it's in, it opens the disk image so you
+can drag the new version over. Turn the check off in **Settings → Check for updates automatically**.
+
 ## Using it with Proxmox VE
 
 ### 1. Prepare the VM (once per VM)
@@ -200,11 +207,11 @@ Chili asks Proxmox to route the session through the host you entered, so a singl
 even in a cluster. Over the internet, put both ports behind a VPN (WireGuard, Tailscale…) rather than
 exposing them.
 
-#### Through a Cloudflare Tunnel (Windows app)
+#### Through a Cloudflare Tunnel
 
 If Proxmox is published with `cloudflared` and only port 8006 is reachable (over HTTPS), SPICE needs the
-spiceproxy too. Cloudflare can't carry it as a web page, but it can as a TCP service, which the Windows
-app reaches over WebSocket by itself (no WARP or `cloudflared` on the PC):
+spiceproxy too. Cloudflare can't carry it as a web page, but it can as a TCP service, which Chili
+reaches over WebSocket by itself, on macOS and Windows (no WARP or `cloudflared` on the computer):
 
 1. Add a public hostname to the tunnel for the spiceproxy, as **TCP**: in the Zero Trust dashboard,
    *Networks → Tunnels → your tunnel → Public Hostname → Add*, type `TCP`, URL `localhost:3128`; or in
@@ -338,7 +345,8 @@ The classic viewer writes its log to `~/Library/Logs/Chili/remote-viewer.log` (*
 
 ## Privacy and security
 
-- Chili talks only to the servers you add. There is no telemetry and no update check.
+- Chili talks only to the servers you add, and to GitHub's API to look for new releases (this check can
+  be turned off). There is no telemetry.
 - Passwords and token secrets are stored in your login Keychain only when *Remember in Keychain* is on.
 - Proxmox certificates are accepted only after you confirm their SHA-256 fingerprint, which is then
   pinned per host and port, for the API and the web consoles. SPICE sessions are verified against the

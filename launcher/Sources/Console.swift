@@ -18,6 +18,8 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
 
     /// SPICE: fetches fresh connection options (Proxmox tickets are single-use).
     private let reconnectOptions: (() async throws -> ViewerConfig)?
+    /// SPICE: extra detail for the "Disconnected" message (the Cloudflare Tunnel's last error).
+    private let diagnostic: (() -> String?)?
     /// Web: fresh login cookie + URL, since Proxmox tickets expire.
     private let webReload: (() async throws -> (URL, HTTPCookie?))?
     /// Web: certificate pinned by the user for this server.
@@ -31,8 +33,10 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
     @Published private(set) var agentConnected = false
     @Published var window: ConsoleWindowController?
 
-    init(config: ViewerConfig, title: String, reconnect: (() async throws -> ViewerConfig)? = nil) {
+    init(config: ViewerConfig, title: String, reconnect: (() async throws -> ViewerConfig)? = nil,
+         diagnostic: (() -> String?)? = nil) {
         self.title = title
+        self.diagnostic = diagnostic
         let view = CSDisplayView(frame: NSRect(x: 0, y: 0, width: 1024, height: 768))
         spiceView = view
         displayView = view
@@ -55,6 +59,7 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
         displayView = web
         spiceView = nil
         reconnectOptions = nil
+        diagnostic = nil
         webReload = load
         trustedHost = (host, port)
         super.init()
@@ -88,6 +93,9 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
         guard let connection else { return }
         state = connection.state
         errorMessage = connection.errorMessage
+        if state == .disconnected, let extra = diagnostic?() {
+            errorMessage = [errorMessage, extra].compactMap { $0 }.joined(separator: "\n")
+        }
         mouseMode = connection.mouseMode
         agentConnected = connection.agentConnected
     }

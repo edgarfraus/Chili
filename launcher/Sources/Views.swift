@@ -13,6 +13,7 @@ struct ContentView: View {
             Sidebar()
             DetailView()
                 .id(model.selection)   // rebuild the pane on every selection change
+                .safeAreaInset(edge: .top, spacing: 0) { UpdateBanner(updater: model.updater) }
         }
         .frame(minWidth: 820, maxWidth: .infinity, minHeight: 480, maxHeight: .infinity)
         .sheet(item: $model.editingProfile) { profile in
@@ -571,7 +572,11 @@ struct ServerEditor: View {
                     SecureField("Secret", text: $secret, prompt: isNew ? nil : Text("unchanged"))
                 }
                 Toggle("Remember in Keychain", isOn: $profile.rememberSecret)
+                TextField("SPICE tunnel", text: $profile.spiceTunnelHost, prompt: Text(verbatim: "spice.example.com"))
             }
+            Text("Only if Proxmox is reachable through a Cloudflare Tunnel: the hostname of the tunnel's TCP service for spiceproxy (service: tcp://localhost:3128). Leave empty otherwise.")
+                .font(.caption).foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             if profile.authMethod == .token {
                 Text("The token needs the VM.Console and VM.Audit privileges (and VM.PowerMgmt to start VMs).")
                     .font(.caption).foregroundColor(.secondary)
@@ -711,6 +716,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.useClassicViewer) private var classicViewer = false
     @AppStorage(Prefs.quitAfterLaunch) private var quitAfterLaunch = true
     @AppStorage(Prefs.debugLog) private var debugLog = false
+    @AppStorage(Prefs.checkForUpdates) private var checkForUpdates = true
     @State private var resetDone = false
 
     var body: some View {
@@ -726,6 +732,7 @@ struct SettingsView: View {
                 .disabled(!resizeGuest)
             Toggle("Share the clipboard with the VM", isOn: $shareClipboard)
             Divider()
+            Toggle("Check for updates automatically", isOn: $checkForUpdates)
             Toggle("Quit after the console closes when opened from a .vv file", isOn: $quitAfterLaunch)
             Toggle("Use the classic viewer (remote-viewer) instead of the built-in console", isOn: $classicViewer)
             Toggle("Verbose classic viewer logging (for troubleshooting)", isOn: $debugLog)

@@ -47,6 +47,7 @@ enum Prefs {
     static let shareClipboard = "shareClipboard"
     static let consolePlacement = "consolePlacement"     // "main" or "window"
     static let useClassicViewer = "useClassicViewer"     // remote-viewer instead of the built-in console
+    static let checkForUpdates = "checkForUpdates"       // GitHub releases, at launch and every 12 h
 
     static func registerDefaults() {
         UserDefaults.standard.register(defaults: [
@@ -55,6 +56,7 @@ enum Prefs {
             shareClipboard: true,
             consolePlacement: "main",
             useClassicViewer: false,
+            checkForUpdates: true,
             fullscreen: false,
             quitAfterLaunch: true,
             debugLog: false,

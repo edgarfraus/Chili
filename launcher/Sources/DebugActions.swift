@@ -1,4 +1,5 @@
 import AppKit
+import Network
 import SwiftUI
 
 /// Development aid, enabled only through CHILI_DEBUG_ACTION (see main.swift).
@@ -232,5 +233,87 @@ enum DebugActions {
             + ["Nov 22 01:41:00 pve1 kernel: warning: something odd", "Nov 22 01:41:02 pve1 pveproxy[999]: error: connection refused"]
         return previewWindow(NodeLogView(session: previewSession(app: app), node: "pve1", preview: lines),
                              size: NSSize(width: 980, height: 640))
+    }
+
+    /// spicetunnel:<vmid> — the Cloudflare Tunnel path without Cloudflare: an in-process WebSocket↔TCP
+    /// bridge to the server's spiceproxy plays cloudflared, and a copy of the profile (in memory only)
+    /// points spiceTunnelHost at it. Opens a running VM's console through it (never starts a VM).
+    static func spiceTunnel(app: AppModel, real: ServerSession, vmid: String) async {
+        let bridge = WebSocketBridge(targetHost: real.api.host, targetPort: 3128)
+        guard let port = try? await bridge.start() else { return log("spicetunnel: bridge failed to start") }
+        var profile = real.profile
+        profile.spiceTunnelHost = "ws://localhost:\(port)/"
+        let session = ServerSession(profile: profile, app: app)
+        session.login(secret: real.storedSecret ?? "")
+        for _ in 0..<40 where session.state != .ready { try? await Task.sleep(nanoseconds: 500_000_000) }
+        let vm = session.vms.first { String($0.vmid) == vmid }
+        log("spicetunnel: state=\(session.state) vm=\(vm?.displayName ?? "-") running=\(vm?.isRunning ?? false) bridge port=\(port)")
+        guard let vm, vm.isRunning else {
+            return log("spicetunnel: running VMs: \(session.vms.filter { $0.isRunning && !$0.isContainer }.map { "\($0.vmid) \($0.displayName)" })")
+        }
+        session.connect(vm)
+        try? await Task.sleep(nanoseconds: 10_000_000_000)
+        log("spicetunnel: websockets bridged=\(bridge.count) client streams=\(session.tunnel?.bridgedCount ?? 0) " +
+            "tunnel error=\(session.tunnel?.lastError ?? "none") console=\(app.consoles.last.map { "\($0.state.rawValue)" } ?? "none")")
+        keep += [session, bridge]   // leave the console usable
+    }
+    private static var keep: [AnyObject] = []
+}
+
+/// Debug only: a WebSocket server that pipes each connection to a TCP target (what cloudflared does
+/// on the server side of a tunnel).
+final class WebSocketBridge {
+    private let target: NWEndpoint
+    private let queue = DispatchQueue(label: "chili.debug.bridge")
+    private var listener: NWListener?
+    private(set) var count = 0
+
+    init(targetHost: String, targetPort: UInt16) {
+        target = .hostPort(host: NWEndpoint.Host(targetHost), port: NWEndpoint.Port(rawValue: targetPort)!)
+    }
+
+    func start() async throws -> UInt16 {
+        let params = NWParameters.tcp
+        let ws = NWProtocolWebSocket.Options()
+        ws.autoReplyPing = true
+        params.defaultProtocolStack.applicationProtocols.insert(ws, at: 0)
+        let l = try NWListener(using: params)
+        listener = l
+        l.newConnectionHandler = { [weak self] c in self?.bridge(c) }
+        return try await withCheckedThrowingContinuation { cont in
+            var done = false
+            l.stateUpdateHandler = { state in
+                guard !done else { return }
+                if case .ready = state { done = true; cont.resume(returning: l.port?.rawValue ?? 0) }
+                if case .failed(let e) = state { done = true; cont.resume(throwing: e) }
+            }
+            l.start(queue: queue)
+        }
+    }
+
+    private func bridge(_ client: NWConnection) {
+        let tcp = NWConnection(to: target, using: .tcp)
+        count += 1
+        func close() { client.cancel(); tcp.cancel() }
+        func up() {
+            client.receiveMessage { data, _, _, error in
+                guard error == nil, let data else { return close() }
+                tcp.send(content: data, completion: .contentProcessed { e in e == nil ? up() : close() })
+            }
+        }
+        func down() {
+            tcp.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, done, error in
+                if let data, !data.isEmpty {
+                    let meta = NWProtocolWebSocket.Metadata(opcode: .binary)
+                    let ctx = NWConnection.ContentContext(identifier: "bin", metadata: [meta])
+                    client.send(content: data, contentContext: ctx, isComplete: true,
+                                completion: .contentProcessed { e in e == nil && !done ? down() : close() })
+                } else if done || error != nil { close() } else { down() }
+            }
+        }
+        client.start(queue: queue)
+        tcp.start(queue: queue)
+        up()
+        down()
     }
 }

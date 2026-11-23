@@ -16,6 +16,7 @@ struct AlertInfo: Identifiable {
 @MainActor
 final class AppModel: ObservableObject {
     let profiles = ProfileStore()
+    let updater = Updater()
     @Published var selection: SidebarItem? = .quickConnect
     @Published var editingProfile: ServerProfile?
     @Published var alert: AlertInfo?
@@ -59,12 +60,14 @@ final class AppModel: ObservableObject {
 
     /// Opens a SPICE console. `.standalone` is for .vv files: a bare window, no main window.
     func openConsole(config: ViewerConfig, title: String, placement: Placement? = nil,
-                     reconnect: (() async throws -> ViewerConfig)? = nil) {
+                     reconnect: (() async throws -> ViewerConfig)? = nil,
+                     diagnostic: (() -> String?)? = nil) {
         if UserDefaults.standard.bool(forKey: Prefs.useClassicViewer) {
             do { try ViewerLauncher.shared.launch(config: config, title: title) } catch { present(error) }
             return
         }
-        let session = ConsoleSession(config: config, title: config["title"] ?? title, reconnect: reconnect)
+        let session = ConsoleSession(config: config, title: config["title"] ?? title, reconnect: reconnect,
+                                     diagnostic: diagnostic)
         consoles.append(session)
         let wantsFullScreen = config["fullscreen"] == "1" || UserDefaults.standard.bool(forKey: Prefs.fullscreen)
         let where_ = placement ?? (UserDefaults.standard.string(forKey: Prefs.consolePlacement) == "window"
@@ -254,9 +257,42 @@ final class ServerSession: ObservableObject {
 
     func logout() {
         refreshTimer?.invalidate()
+        spiceTunnel?.stop()
+        spiceTunnel = nil
         state = .loggedOut
         vms = []
         password = ""
+    }
+
+    deinit { spiceTunnel?.stop() }
+
+    private var spiceTunnel: TcpOverWebSocket?
+
+    /// The local end of the Cloudflare Tunnel to spiceproxy, if this server uses one.
+    var tunnel: TcpOverWebSocket? {
+        let host = profile.spiceTunnelHost.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !host.isEmpty else { return nil }
+        if spiceTunnel == nil { spiceTunnel = TcpOverWebSocket(host: host) }
+        return spiceTunnel
+    }
+
+    /// A SPICE ticket for the VM, routed through the Cloudflare Tunnel when configured.
+    func spiceConfig(for vm: ProxmoxVM) async throws -> ViewerConfig {
+        var config = try await client.spiceConfig(for: vm)
+        if let tunnel {
+            let port = try await tunnel.start()
+            config["proxy"] = "http://127.0.0.1:\(port)"
+        }
+        return config
+    }
+
+    /// The tunnel's last error, for the console's "Disconnected" message.
+    var tunnelDiagnostic: (() -> String?)? {
+        guard let tunnel else { return nil }
+        let host = profile.spiceTunnelHost
+        return {
+            tunnel.lastError.map { String(format: NSLocalizedString("Cloudflare Tunnel (%@): %@", comment: ""), host, $0) }
+        }
     }
 
     func reload() async throws {
@@ -320,15 +356,15 @@ final class ServerSession: ObservableObject {
                 }
                 let config: ViewerConfig
                 do {
-                    config = try await client.spiceConfig(for: vm)
+                    config = try await spiceConfig(for: vm)
                 } catch ProxmoxError.noSpice {
                     // No SPICE display: fall back to Proxmox' noVNC console.
                     openWebConsole(.vm(vm), placement: placement)
                     return
                 }
-                let client = self.client
                 app?.openConsole(config: config, title: "\(vm.displayName) (\(vm.vmid))", placement: placement,
-                                 reconnect: { try await client.spiceConfig(for: vm) })
+                                 reconnect: { [self] in try await spiceConfig(for: vm) },
+                                 diagnostic: tunnelDiagnostic)
             } catch {
                 app?.present(error)
             }
