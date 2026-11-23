@@ -15,3 +15,8 @@
 
 /* Wizards and logs */
 "Loading…" = "Caricamento…";
+
+/* Cloudflare Tunnel */
+"SPICE tunnel" = "Tunnel SPICE";
+"Cloudflare Tunnel (%@): %@" = "Tunnel Cloudflare (%@): %@";
+"Only if Proxmox is reachable through a Cloudflare Tunnel: the hostname of the tunnel's TCP service for spiceproxy (service: tcp://localhost:3128). Leave empty otherwise." = "Solo se Proxmox è raggiungibile tramite un Cloudflare Tunnel: il nome host del servizio TCP del tunnel per lo spiceproxy (service: tcp://localhost:3128). Altrimenti lascialo vuoto.";

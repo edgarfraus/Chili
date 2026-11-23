@@ -27,6 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # windows-v1.2.3 tags set the version; otherwise VERSION (shared with macOS).
+      - name: Version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/windows-v* ]]; then v="${GITHUB_REF#refs/tags/windows-v}"; else v="$(cat VERSION)"; fi
+          echo "CHILI_VERSION=$v" >> "$GITHUB_ENV"
+
       # remote-viewer, spice-glib, GTK and GStreamer come from MSYS2.
       - uses: msys2/setup-msys2@v2
         with:
@@ -53,7 +60,7 @@ jobs:
         run: dotnet test windows/tests/Chili.Core.Tests
 
       - name: Publish
-        run: dotnet publish windows/src/Chili/Chili.csproj -c Release -p:Platform=x64 -o windows/build/publish/x64
+        run: dotnet publish windows/src/Chili/Chili.csproj -c Release -p:Platform=x64 -p:Version=${{ env.CHILI_VERSION }} -o windows/build/publish/x64
 
       # The published app must start (a missing Chili.pri crashes it at launch) and render.
       - name: Smoke test
@@ -75,7 +82,7 @@ jobs:
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; }
-          $version = (Get-Content VERSION).Trim()
+          $version = $env:CHILI_VERSION
           & $iscc /Q "/DAppVersion=$version" /DArch=x64 windows\installer\Chili.iss
           if ($LASTEXITCODE) { throw "ISCC failed" }
           Get-ChildItem windows\build\dist\*.exe | ForEach-Object {

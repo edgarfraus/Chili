@@ -211,6 +211,30 @@ Chili chiede a Proxmox di instradare la sessione attraverso l'host che hai inser
 solo indirizzo anche in un cluster. Da internet, metti entrambe le porte dietro una VPN (WireGuard,
 Tailscale…) invece di esporle.
 
+#### Tramite un Cloudflare Tunnel (app per Windows)
+
+Se Proxmox è pubblicato con `cloudflared` ed è raggiungibile solo la porta 8006 (in HTTPS), per SPICE
+serve anche lo spiceproxy. Cloudflare non può trasportarlo come pagina web, ma può farlo come servizio
+TCP, che l'app per Windows raggiunge da sola via WebSocket (senza WARP né `cloudflared` sul PC):
+
+1. Aggiungi al tunnel un nome host pubblico per lo spiceproxy, di tipo **TCP**: nella dashboard Zero
+   Trust, *Networks → Tunnels → il tuo tunnel → Public Hostname → Add*, tipo `TCP`, URL `localhost:3128`;
+   oppure in `config.yml`, prima della regola finale:
+   ```yaml
+   ingress:
+     - hostname: pve.example.com
+       service: https://localhost:8006
+       originRequest: { noTLSVerify: true }
+     - hostname: spice.example.com
+       service: tcp://localhost:3128
+     - service: http_status:404
+   ```
+   (e `cloudflared tunnel route dns <tunnel> spice.example.com`).
+2. In Chili, modifica il server e inserisci `spice.example.com` in **Tunnel SPICE**.
+
+Non mettere un login di Cloudflare Access sul nome host SPICE: Chili non può superarlo. Lo spiceproxy
+accetta comunque solo i ticket monouso che Proxmox rilascia agli utenti autenticati.
+
 ### Aprire le console dall'interfaccia web di Proxmox
 
 Puoi continuare a usare il browser: **Console → SPICE** (la piccola freccia accanto a *Console*)

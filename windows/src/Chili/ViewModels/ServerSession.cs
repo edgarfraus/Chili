@@ -125,7 +125,26 @@ public sealed partial class ServerSession : ObservableObject
         ApplyFilter();
     }
 
-    public void Stop() => refreshTimer?.Stop();
+    public void Stop()
+    {
+        refreshTimer?.Stop();
+        spiceTunnel?.Dispose();
+        spiceTunnel = null;
+    }
+
+    private TcpOverWebSocket? spiceTunnel;
+
+    /// <summary>The local end of the Cloudflare Tunnel to spiceproxy, if this server uses one.</summary>
+    public TcpOverWebSocket? SpiceTunnel =>
+        Profile.SpiceTunnelHost.Trim().Length == 0 ? null : spiceTunnel ??= new TcpOverWebSocket(Profile.SpiceTunnelHost);
+
+    /// <summary>A SPICE ticket for the VM, routed through the Cloudflare Tunnel when configured.</summary>
+    public async Task<ViewerConfig> SpiceConfigAsync(ProxmoxVM vm)
+    {
+        var config = await client.SpiceConfigAsync(vm);
+        if (SpiceTunnel is { } tunnel) config["proxy"] = $"http://127.0.0.1:{tunnel.Port}";
+        return config;
+    }
 
     public async Task ReloadAsync()
     {

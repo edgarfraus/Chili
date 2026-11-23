@@ -13,13 +13,14 @@ public sealed class Consoles(AppModel model, MainWindow window)
 
     /// <summary>Opens a SPICE connection. <paramref name="freshConfig"/> gets a new ticket for
     /// Reconnect (Proxmox tickets are single-use).</summary>
-    public async Task OpenSpiceAsync(ViewerConfig config, string title, Func<Task<ViewerConfig>>? freshConfig = null)
+    public async Task OpenSpiceAsync(ViewerConfig config, string title, Func<Task<ViewerConfig>>? freshConfig = null,
+                                     Func<string?>? diagnostics = null)
     {
         try
         {
             if (UseBuiltIn)
             {
-                window.OpenConsole(config, title, freshConfig);
+                window.OpenConsole(config, title, freshConfig, diagnostics);
                 if (model.Settings.Preferences.Fullscreen && !window.IsFullScreen) window.ToggleFullScreen();
             }
             else
@@ -46,15 +47,16 @@ public sealed class Consoles(AppModel model, MainWindow window)
                 return;
             }
             ViewerConfig config;
-            try { config = await session.Api.SpiceConfigAsync(vm); }
+            try { config = await session.SpiceConfigAsync(vm); }
             catch (NoSpiceException)
             {
                 // No SPICE display: fall back to Proxmox' noVNC console.
                 await OpenWebConsoleAsync(session, new WebConsoleKind.Vm(vm));
                 return;
             }
-            var api = session.Api;
-            await OpenSpiceAsync(config, $"{vm.DisplayName} ({vm.VmId})", () => api.SpiceConfigAsync(vm));
+            var tunnel = session.SpiceTunnel;
+            await OpenSpiceAsync(config, $"{vm.DisplayName} ({vm.VmId})", () => session.SpiceConfigAsync(vm),
+                                 tunnel is null ? null : () => tunnel.LastError is { } e ? L.F("Cloudflare Tunnel (%@): %@", session.Profile.SpiceTunnelHost, e) : null);
         }
         catch (Exception e) { await model.PresentAsync(e); }
         finally { if (item is not null) item.Busy = false; }

@@ -12,6 +12,8 @@ public sealed class ConsoleSession
     public Guid Id { get; } = Guid.NewGuid();
     public string Title { get; }
     public SpiceConnection Connection { get; private set; }
+    /// <summary>Extra detail for a failed connection (e.g. why the Cloudflare Tunnel didn't open).</summary>
+    public Func<string?>? Diagnostics { get; init; }
     private ViewerConfig config;
     private readonly Func<Task<ViewerConfig>>? freshConfig;
     private readonly DispatcherQueue ui;

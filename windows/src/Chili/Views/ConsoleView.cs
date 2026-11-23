@@ -117,8 +117,9 @@ public sealed class ConsoleView : UserControl
         connecting.Visibility = c.State == SpiceConnection.ConnectionState.Connecting ? Visibility.Visible : Visibility.Collapsed;
         disconnected.Visibility = c.State == SpiceConnection.ConnectionState.Disconnected ? Visibility.Visible : Visibility.Collapsed;
         display.Visibility = c.State == SpiceConnection.ConnectionState.Connected ? Visibility.Visible : Visibility.Collapsed;
-        reason.Text = c.ErrorMessage ?? "";
-        reason.Visibility = c.ErrorMessage is null ? Visibility.Collapsed : Visibility.Visible;
+        var detail = c.State == SpiceConnection.ConnectionState.Disconnected ? session.Diagnostics?.Invoke() : null;
+        reason.Text = string.Join("\n\n", new[] { c.ErrorMessage, detail }.Where(s => !string.IsNullOrEmpty(s)));
+        reason.Visibility = reason.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         ctrlAltDel.IsEnabled = c.State == SpiceConnection.ConnectionState.Connected;
         if (c.State == SpiceConnection.ConnectionState.Connected && (lastState != c.State || lastMode != c.MouseMode)
             && c.MouseMode == SpiceConnection.MouseModes.Server)

@@ -267,3 +267,83 @@ public class LaunchArgumentTests
         Assert.Equal("spice://h:1", LaunchArguments.Target(LaunchArguments.Split("Chili.exe spice://h:1")));
     }
 }
+
+public class TcpOverWebSocketTests
+{
+    [Theory]
+    [InlineData("spice.example.com", "wss://spice.example.com/")]
+    [InlineData(" https://spice.example.com ", "wss://spice.example.com/")]
+    [InlineData("ws://localhost:8080/x", "ws://localhost:8080/x")]
+    public void Endpoints(string host, string expected) =>
+        Assert.Equal(expected, TcpOverWebSocket.EndpointFor(host).AbsoluteUri);
+
+    /// <summary>TCP bytes go out as binary WebSocket frames and come back, for several
+    /// connections at once (SPICE opens one per channel).</summary>
+    [Fact]
+    public async Task PipesTcpThroughWebSocket()
+    {
+        int port = FreePort();
+        using var http = new System.Net.HttpListener();
+        http.Prefixes.Add($"http://localhost:{port}/");
+        http.Start();
+        _ = Task.Run(async () =>
+        {
+            while (http.IsListening)
+            {
+                System.Net.HttpListenerContext ctx;
+                try { ctx = await http.GetContextAsync(); } catch { return; }
+                _ = Task.Run(async () =>
+                {
+                    var ws = (await ctx.AcceptWebSocketAsync(null)).WebSocket;
+                    var buf = new byte[4096];
+                    while (true)
+                    {
+                        var r = await ws.ReceiveAsync(buf, default);
+                        if (r.MessageType == System.Net.WebSockets.WebSocketMessageType.Close) break;
+                        Assert.Equal(System.Net.WebSockets.WebSocketMessageType.Binary, r.MessageType);
+                        await ws.SendAsync(buf.AsMemory(0, r.Count), System.Net.WebSockets.WebSocketMessageType.Binary, true, default);
+                    }
+                    await ws.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, null, default);
+                });
+            }
+        });
+
+        using var tunnel = new TcpOverWebSocket($"ws://localhost:{port}/");
+        async Task<string> RoundTrip(string text)
+        {
+            using var tcp = new System.Net.Sockets.TcpClient();
+            await tcp.ConnectAsync(System.Net.IPAddress.Loopback, tunnel.Port);
+            var s = tcp.GetStream();
+            var data = Encoding.UTF8.GetBytes(text);
+            await s.WriteAsync(data);
+            var back = new byte[data.Length];
+            int got = 0;
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            while (got < back.Length) got += await s.ReadAsync(back.AsMemory(got), cts.Token);
+            return Encoding.UTF8.GetString(back);
+        }
+        var results = await Task.WhenAll(Enumerable.Range(0, 4).Select(i => RoundTrip($"CONNECT channel {i}\r\n\r\n")));
+        Assert.Equal(Enumerable.Range(0, 4).Select(i => $"CONNECT channel {i}\r\n\r\n"), results);
+        Assert.Null(tunnel.LastError);
+    }
+
+    [Fact]
+    public async Task ReportsUnreachableHost()
+    {
+        using var tunnel = new TcpOverWebSocket($"ws://localhost:{FreePort()}/");
+        using var tcp = new System.Net.Sockets.TcpClient();
+        await tcp.ConnectAsync(System.Net.IPAddress.Loopback, tunnel.Port);
+        var n = await tcp.GetStream().ReadAsync(new byte[1]);   // closed once the WebSocket fails
+        Assert.Equal(0, n);
+        Assert.NotNull(tunnel.LastError);
+    }
+
+    private static int FreePort()
+    {
+        var l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        l.Start();
+        int p = ((System.Net.IPEndPoint)l.LocalEndpoint).Port;
+        l.Stop();
+        return p;
+    }
+}

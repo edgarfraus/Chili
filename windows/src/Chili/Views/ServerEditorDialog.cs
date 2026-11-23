@@ -24,6 +24,13 @@ public sealed class ServerEditorDialog : ContentDialog
     private readonly TextBox tokenId = new() { PlaceholderText = "user@pam!spice" };
     private readonly PasswordBox secret = new();
     private readonly CheckBox remember = new() { Content = L.T("Remember in Credential Manager") };
+    private readonly TextBox tunnel = new() { PlaceholderText = "spice.example.com" };
+    private readonly TextBlock tunnelHint = new()
+    {
+        Text = L.T("Only if Proxmox is reachable through a Cloudflare Tunnel: the hostname of the tunnel's TCP service for spiceproxy (service: tcp://localhost:3128). Leave empty otherwise."),
+        TextWrapping = TextWrapping.Wrap, Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
+        Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+    };
     private readonly TextBlock tokenHint = new()
     {
         Text = L.T("The token needs the VM.Console and VM.Audit privileges (and VM.PowerMgmt to start VMs)."),
@@ -60,6 +67,7 @@ public sealed class ServerEditorDialog : ContentDialog
         user.Text = original.Username;
         tokenId.Text = original.TokenId;
         remember.IsChecked = original.RememberSecret;
+        tunnel.Text = original.SpiceTunnelHost;
         if (!isNew) secret.PlaceholderText = L.T("unchanged");
 
         var grid = new Grid { ColumnSpacing = 12, RowSpacing = 10, Width = 440 };
@@ -85,6 +93,8 @@ public sealed class ServerEditorDialog : ContentDialog
         var secretRow = Row(L.T("Password"), secret);
         Row(null, remember);
         var hintRow = Row(null, tokenHint);
+        Row(L.T("SPICE tunnel"), tunnel);
+        Row(null, tunnelHint);
         passwordRows = [.. userRow, .. realmRow];
         tokenRows = [.. tokenRow, .. hintRow];
         secretLabel = (TextBlock)secretRow[0];
@@ -170,6 +180,7 @@ public sealed class ServerEditorDialog : ContentDialog
             Realm = SelectedRealm,
             TokenId = tokenId.Text.Trim(),
             RememberSecret = remember.IsChecked == true,
+            SpiceTunnelHost = tunnel.Text.Trim(),
         };
     }
 }

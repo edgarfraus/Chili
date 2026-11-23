@@ -100,6 +100,71 @@ public sealed partial class MainWindow
         catch (Exception e) { Debug.Log($"ctcreate: FAILED {e.Message}"); }
     }
 
+    /// <summary>spicetunnel:&lt;vmid&gt; — the Cloudflare Tunnel path without Cloudflare: an in-process
+    /// WebSocket↔TCP bridge to the server's spiceproxy plays cloudflared, and a copy of the profile
+    /// (in memory only) points SpiceTunnelHost at it. Opens a running VM's console through it.</summary>
+    private async Task DebugSpiceTunnelAsync(int vmid)
+    {
+        if (await ReadySessionAsync() is not { } real) { Debug.Log("spicetunnel: not logged in"); return; }
+        int port = 47000 + Random.Shared.Next(1000);
+        var http = new System.Net.HttpListener();
+        http.Prefixes.Add($"http://localhost:{port}/");
+        http.Start();
+        int bridged = 0;
+        _ = Task.Run(async () =>
+        {
+            while (http.IsListening)
+            {
+                System.Net.HttpListenerContext ctx;
+                try { ctx = await http.GetContextAsync(); } catch { return; }
+                _ = Task.Run(async () =>
+                {
+                    var ws = (await ctx.AcceptWebSocketAsync(null)).WebSocket;
+                    using var tcp = new System.Net.Sockets.TcpClient();
+                    await tcp.ConnectAsync(real.Api.Host, 3128);
+                    Interlocked.Increment(ref bridged);
+                    var s = tcp.GetStream();
+                    var up = Task.Run(async () =>
+                    {
+                        var b = new byte[65536];
+                        try
+                        {
+                            while (true)
+                            {
+                                var r = await ws.ReceiveAsync(b, default);
+                                if (r.MessageType == System.Net.WebSockets.WebSocketMessageType.Close) break;
+                                await s.WriteAsync(b.AsMemory(0, r.Count));
+                            }
+                        }
+                        catch { }
+                    });
+                    var down = Task.Run(async () =>
+                    {
+                        var b = new byte[65536];
+                        try
+                        {
+                            int n;
+                            while ((n = await s.ReadAsync(b)) > 0)
+                                await ws.SendAsync(b.AsMemory(0, n), System.Net.WebSockets.WebSocketMessageType.Binary, true, default);
+                        }
+                        catch { }
+                    });
+                    await Task.WhenAny(up, down);
+                });
+            }
+        });
+        var session = new ServerSession(real.Profile with { SpiceTunnelHost = $"ws://localhost:{port}/" }, model);
+        session.Login(real.StoredSecret ?? "");
+        for (int i = 0; i < 40 && session.State != ServerSession.SessionState.Ready; i++) await Task.Delay(500);
+        var vm = session.VMs.FirstOrDefault(v => v.VmId == vmid);
+        Debug.Log($"spicetunnel: state={session.State} vm={vm?.DisplayName} running={vm?.IsRunning} local port={session.SpiceTunnel?.Port}");
+        if (vm is not { IsRunning: true }) return;
+        await Consoles.ConnectAsync(session, vm);
+        await Task.Delay(8000);
+        Debug.Log($"spicetunnel: websockets bridged={bridged} tunnel error={session.SpiceTunnel?.LastError ?? "none"} " +
+                  $"console={model.Consoles.LastOrDefault()?.Connection.State}");
+    }
+
     /// <summary>cleanup: deletes every machine whose configured name/hostname starts with chili-test-.</summary>
     private async Task DebugCleanupAsync()
     {

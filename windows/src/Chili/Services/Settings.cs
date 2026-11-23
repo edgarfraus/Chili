@@ -19,6 +19,9 @@ public sealed record ServerProfile
     public string Realm { get; init; } = "pam";
     public string TokenId { get; init; } = "";      // "user@realm!name"
     public bool RememberSecret { get; init; } = true;
+    /// <summary>Hostname of a Cloudflare Tunnel TCP service for spiceproxy (port 3128), when the
+    /// server is only reachable through the tunnel. Empty: SPICE goes to Host:3128 directly.</summary>
+    public string SpiceTunnelHost { get; init; } = "";
 
     [JsonIgnore] public string Title => Name.Length == 0 ? Host : Name;
     [JsonIgnore] public string FullUsername => Username.Contains('@') ? Username : $"{Username}@{Realm}";

@@ -18,6 +18,9 @@ by GitHub Actions.
   shared clipboard, audio, Ctrl+Alt+Del, full screen. Quick Connect for any SPICE server.
 - New VM (recommended preset or every option) and new container wizards; history & logs per VM;
   system log per node.
+- **SPICE through a Cloudflare Tunnel** without WARP or cloudflared on the PC: publish the spiceproxy
+  (`tcp://localhost:3128`) on its own hostname and enter it under *SPICE tunnel* in the server settings
+  (see the README, *Network requirements*).
 - English and Italian.
 
 Not yet on Windows: noVNC, container consoles and the node shell open in your browser (Proxmox asks you to

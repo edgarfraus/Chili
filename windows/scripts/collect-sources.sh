@@ -9,7 +9,7 @@ set -euo pipefail
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 VIEWER="$REPO/windows/build/viewer"
 OUT=${1:-$REPO/windows/build/dist}
-VERSION=$(cat "$REPO/VERSION")
+VERSION=${CHILI_VERSION:-$(cat "$REPO/VERSION")}
 name="Chili-$VERSION-windows-sources"
 stage="$REPO/windows/build/$name"
 

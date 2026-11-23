@@ -126,9 +126,10 @@ public sealed partial class MainWindow : Window
     private static string ConsoleTag(ConsoleSession c) => $"console:{c.Id}";
 
     /// <summary>Opens a built-in SPICE console in the main window and connects it.</summary>
-    public void OpenConsole(Core.ViewerConfig config, string title, Func<Task<Core.ViewerConfig>>? freshConfig)
+    public void OpenConsole(Core.ViewerConfig config, string title, Func<Task<Core.ViewerConfig>>? freshConfig,
+                            Func<string?>? diagnostics = null)
     {
-        var session = new ConsoleSession(config, title, freshConfig, DispatcherQueue);
+        var session = new ConsoleSession(config, title, freshConfig, DispatcherQueue) { Diagnostics = diagnostics };
         session.Changed += () => UpdateConsoleIcon(session);
         model.Consoles.Add(session);
         session.Connect();
@@ -331,6 +332,9 @@ public sealed partial class MainWindow : Window
                 break;
             case "ctcreate":
                 await DebugCreateContainerAsync();
+                break;
+            case var t when t.StartsWith("spicetunnel:") && int.TryParse(t[12..], out var tid):
+                await DebugSpiceTunnelAsync(tid);
                 break;
             case "cleanup":
                 await DebugCleanupAsync();
