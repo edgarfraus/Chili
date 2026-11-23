@@ -1,3 +1,11 @@
+### What's new in 1.0.1
+
+- **Automatic updates**: Chili checks GitHub for new releases and installs them with **Update Now**
+  (can be turned off in Settings). From this version on, updating no longer means downloading the DMG.
+- **SPICE through a Cloudflare Tunnel**: if Proxmox is published with `cloudflared`, enter the hostname of
+  the tunnel's TCP service for spiceproxy under **SPICE tunnel** in the server settings. No WARP or
+  `cloudflared` needed on the Mac (see the [guide](../../#through-a-cloudflare-tunnel)).
+
 ### Download
 
 | Your Mac | File |
