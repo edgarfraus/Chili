@@ -36,6 +36,7 @@ public sealed partial class MainWindow : Window
         model.ShowAlert = ShowAlertAsync;
         model.ServersChanged += () => BuildMenu(Nav.SelectedItem is NavigationViewItem { Tag: string t } ? t : null);
         BuildMenu(model.Settings.Servers.FirstOrDefault() is { } first ? ServerTag(first) : QuickTag);
+        StartUpdater();
         Debug.StartSnapshots(this, "main");
         if (Debug.Action is { } action) DispatcherQueue.TryEnqueue(async () => await RunDebugAction(action));
     }
@@ -160,6 +161,69 @@ public sealed partial class MainWindow : Window
             _ => "TextFillColorSecondaryBrush",
         };
         icon.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[key];
+    }
+
+    // MARK: Updates
+
+    private Updater? updater;
+
+    private void StartUpdater()
+    {
+        updater = new Updater(() => model.Settings.Preferences.CheckForUpdates);
+        updater.Available += ShowUpdate;
+        updater.Start(DispatcherQueue);
+    }
+
+    private void ShowUpdate(Core.ReleaseInfo release)
+    {
+        UpdateBar.Title = L.F("Chili %@ is available", release.Version.ToString(3));
+        UpdateBar.Message = L.F("You have version %@.", Updater.Current.ToString(3));
+        UpdateBar.Severity = InfoBarSeverity.Informational;
+        UpdateButton.Content = L.T("Update Now");
+        UpdateButton.IsEnabled = true;
+        UpdateNotes.Content = L.T("What's New");
+        UpdateProgress.Visibility = Visibility.Collapsed;
+        UpdateBar.IsOpen = true;
+    }
+
+    private async void OnUpdateNotes(object sender, RoutedEventArgs e)
+    {
+        if (updater?.Pending is { } r) await Windows.System.Launcher.LaunchUriAsync(new Uri(r.PageUrl));
+    }
+
+    private async void OnUpdateNow(object sender, RoutedEventArgs e)
+    {
+        if (updater?.Pending is not { } release) return;
+        if (model.Consoles.Count > 0 && !await ConfirmAsync(L.T("Update Chili now?"),
+                L.T("Chili closes while the update installs, and reopens afterwards. Open consoles are disconnected."),
+                L.T("Update Now")))
+            return;
+        UpdateButton.IsEnabled = false;
+        UpdateProgress.Visibility = Visibility.Visible;
+        UpdateProgress.Value = 0;
+        UpdateBar.Message = L.T("Downloading the update…");
+        try
+        {
+            var setup = await updater.DownloadAsync(release, new Progress<double>(p => UpdateProgress.Value = p * 100));
+            if (!Updater.IsInstalled)
+            {
+                // Development build: never run the installer over it.
+                UpdateBar.Message = L.F("Downloaded and verified: %@", setup);
+                UpdateProgress.Visibility = Visibility.Collapsed;
+                return;
+            }
+            UpdateBar.Message = L.T("Installing…");
+            foreach (var c in model.Consoles.ToList()) c.Close();
+            Updater.RunInstaller(setup);   // replaces the files and starts Chili again
+            Application.Current.Exit();
+        }
+        catch (Exception ex)
+        {
+            UpdateBar.Severity = InfoBarSeverity.Error;
+            UpdateBar.Message = ex.Message;
+            UpdateButton.IsEnabled = true;
+            UpdateProgress.Visibility = Visibility.Collapsed;
+        }
     }
 
     /// <summary>A .vv file or spice:// link from the command line or a file association.</summary>
@@ -338,6 +402,10 @@ public sealed partial class MainWindow : Window
                 break;
             case "cleanup":
                 await DebugCleanupAsync();
+                break;
+            case "update" when updater is not null:
+                await updater.CheckAsync();
+                if (updater.Pending is not null) OnUpdateNow(this, new RoutedEventArgs());
                 break;
             case "alert":
                 await model.PresentAsync(new Core.Proxmox.HttpProxmoxException(0, "Parameter verification failed.\nnet0: invalid format"));

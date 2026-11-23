@@ -23,9 +23,28 @@
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
         </NavigationView.FooterMenuItems>
-        <ContentControl
-            x:Name="Detail"
-            HorizontalContentAlignment="Stretch"
-            VerticalContentAlignment="Stretch" />
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <!-- A newer Chili is available (Services/Updater.cs). -->
+            <InfoBar x:Name="UpdateBar" Severity="Informational" IsOpen="False" Margin="12,8,12,0">
+                <InfoBar.ActionButton>
+                    <Button x:Name="UpdateButton" Click="OnUpdateNow" Style="{StaticResource AccentButtonStyle}" />
+                </InfoBar.ActionButton>
+                <InfoBar.Content>
+                    <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,8">
+                        <HyperlinkButton x:Name="UpdateNotes" Click="OnUpdateNotes" Padding="0" />
+                        <ProgressBar x:Name="UpdateProgress" Width="200" Visibility="Collapsed" VerticalAlignment="Center" />
+                    </StackPanel>
+                </InfoBar.Content>
+            </InfoBar>
+            <ContentControl
+                x:Name="Detail"
+                Grid.Row="1"
+                HorizontalContentAlignment="Stretch"
+                VerticalContentAlignment="Stretch" />
+        </Grid>
     </NavigationView>
 </Window>

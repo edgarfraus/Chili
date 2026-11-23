@@ -92,8 +92,17 @@ Root: HKA; Subkey: "Software\Classes\spice+tls\shell\open\command"; ValueType: s
 
 [Run]
 Filename: "{app}\Chili.exe"; Description: "{cm:LaunchProgram,Chili}"; Flags: nowait postinstall skipifsilent
+; Updates started by Chili (silent, /CHILIRESTART=1): start it again afterwards.
+Filename: "{app}\Chili.exe"; Flags: nowait; Check: StartedByUpdater
 
 [UninstallDelete]
 ; Caches only (GStreamer registry, logs); settings and saved servers stay in %APPDATA%\Chili.
 Type: filesandordirs; Name: "{localappdata}\Chili\Cache"
 Type: filesandordirs; Name: "{localappdata}\Chili\Logs"
+
+[Code]
+// Chili's updater runs the setup silently with /CHILIRESTART=1 and exits; reopen it then.
+function StartedByUpdater: Boolean;
+begin
+  Result := ExpandConstant('{param:CHILIRESTART|0}') = '1';
+end;

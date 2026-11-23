@@ -347,3 +347,45 @@ public class TcpOverWebSocketTests
         return p;
     }
 }
+
+public class UpdateTests
+{
+    private static System.Text.Json.Nodes.JsonArray Releases() => System.Text.Json.Nodes.JsonNode.Parse("""
+        [
+          {"tag_name":"windows-v1.1.0","draft":false,"prerelease":false,"html_url":"https://x/1.1.0","body":"new",
+           "assets":[{"name":"Chili-1.1.0-x64-setup.exe","browser_download_url":"https://x/s110.exe"},
+                     {"name":"Chili-1.1.0-x64-setup.exe.sha256","browser_download_url":"https://x/s110.sha"}]},
+          {"tag_name":"windows-v1.2.0","draft":false,"prerelease":true,
+           "assets":[{"name":"Chili-1.2.0-x64-setup.exe","browser_download_url":"https://x/s120.exe"}]},
+          {"tag_name":"windows-v1.3.0","draft":true,"prerelease":false,
+           "assets":[{"name":"Chili-1.3.0-x64-setup.exe","browser_download_url":"https://x/s130.exe"}]},
+          {"tag_name":"v2.0.0","draft":false,"prerelease":false,
+           "assets":[{"name":"Chili-2.0.0-arm64.dmg","browser_download_url":"https://x/mac.dmg"}]},
+          {"tag_name":"windows-v1.0.1","draft":false,"prerelease":false,
+           "assets":[{"name":"Chili-1.0.1-x64-setup.exe","browser_download_url":"https://x/s101.exe"}]}
+        ]
+        """)!.AsArray();
+
+    [Fact]
+    public void PicksNewestPublishedWindowsRelease()
+    {
+        var r = Updates.Newest(Releases(), new Version(1, 0, 0), "x64")!;
+        Assert.Equal(new Version(1, 1, 0, 0), r.Version);
+        Assert.Equal("https://x/s110.exe", r.SetupUrl);
+        Assert.Equal("https://x/s110.sha", r.Sha256Url);
+        Assert.Null(Updates.Newest(Releases(), new Version(1, 1, 0, 0), "x64"));
+        Assert.Null(Updates.Newest(Releases(), new Version(1, 0, 0), "arm64"));   // no arm64 setup
+    }
+
+    [Theory]
+    [InlineData("windows-v1.0.1", "1.0.1.0")]
+    [InlineData("windows-v2.1", "2.1.0.0")]
+    [InlineData("windows-v1.0.0-beta", null)]
+    [InlineData("v1.0.0", null)]
+    public void Tags(string tag, string? version) =>
+        Assert.Equal(version, Updates.ParseTag(tag)?.ToString());
+
+    [Fact]
+    public void Sha256Files() =>
+        Assert.Equal("abc123", Updates.ParseSha256("abc123  Chili-1.0.1-x64-setup.exe"));
+}

@@ -37,6 +37,8 @@ public sealed class Preferences
     public bool ShareClipboard { get; set; } = true;
     /// <summary>remote-viewer in its own window instead of the built-in console.</summary>
     public bool UseClassicViewer { get; set; }
+    /// <summary>Look for new versions on GitHub at launch and every 12 hours.</summary>
+    public bool CheckForUpdates { get; set; } = true;
     public string QuickHost { get; set; } = "";
     public int QuickPort { get; set; } = 5900;
     public bool QuickTls { get; set; }
