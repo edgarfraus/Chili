@@ -39,17 +39,21 @@ public sealed class ProxmoxClient : IDisposable
         var handler = new SocketsHttpHandler
         {
             UseCookies = false,
+            AllowAutoRedirect = false,   // see IsWebPage
             AutomaticDecompression = DecompressionMethods.All,
             SslOptions = new SslClientAuthenticationOptions { RemoteCertificateValidationCallback = ValidateCertificate },
         };
         http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
     }
 
+    /// <summary>"https" (Proxmox always uses TLS); tests use plain "http" against a local listener.</summary>
+    public string Scheme { get; init; } = "https";
+
     public void Dispose() => http.Dispose();
 
     private Uri BaseUri()
     {
-        if (Host.Length == 0 || !Uri.TryCreate($"https://{Host}:{Port}/", UriKind.Absolute, out var uri))
+        if (Host.Length == 0 || !Uri.TryCreate($"{Scheme}://{Host}:{Port}/", UriKind.Absolute, out var uri))
             throw new InvalidHostException(Host);
         return uri;
     }
@@ -400,6 +404,7 @@ public sealed class ProxmoxClient : IDisposable
                     break;
             }
         }
+        foreach (var (k, v) in ExtraHeaders) req.Headers.TryAddWithoutValidation(k, v);
 
         HttpResponseMessage res;
         try
@@ -422,10 +427,43 @@ public sealed class ProxmoxClient : IDisposable
         using (res)
         {
             var body = await res.Content.ReadAsByteArrayAsync(ct);
+            // Proxmox' API never redirects and never answers with HTML: a login page in front of it
+            // (Cloudflare Access, a reverse proxy…) did.
+            if (IsWebPage(res, body)) throw WebPageInstead(res, body);
             if (!res.IsSuccessStatusCode)
                 throw new HttpProxmoxException((int)res.StatusCode, ErrorMessage(res.ReasonPhrase, body));
             return body;
         }
+    }
+
+    /// <summary>Extra headers sent with every request, e.g. a Cloudflare Access service token
+    /// (CF-Access-Client-Id / CF-Access-Client-Secret).</summary>
+    public Dictionary<string, string> ExtraHeaders { get; } = [];
+
+    private static bool IsWebPage(HttpResponseMessage res, byte[] body)
+    {
+        if ((int)res.StatusCode is >= 300 and < 400) return true;
+        var type = res.Content.Headers.ContentType?.MediaType ?? "";
+        if (type.Contains("html", StringComparison.OrdinalIgnoreCase)) return true;
+        var start = Encoding.UTF8.GetString(body, 0, Math.Min(body.Length, 64)).TrimStart();
+        return start.StartsWith('<');
+    }
+
+    private ProxmoxException WebPageInstead(HttpResponseMessage res, byte[] body)
+    {
+        var location = res.Headers.Location?.ToString() ?? "";
+        var text = Encoding.UTF8.GetString(body);
+        bool access = location.Contains("cloudflareaccess.com", StringComparison.OrdinalIgnoreCase)
+                      || location.Contains("/cdn-cgi/access/", StringComparison.OrdinalIgnoreCase)
+                      || res.Headers.Contains("cf-access-domain") || res.Headers.Contains("CF-Access-Aud")
+                      || text.Contains("cloudflareaccess", StringComparison.OrdinalIgnoreCase)
+                      || text.Contains("Cloudflare Access", StringComparison.OrdinalIgnoreCase)
+                      || text.Contains("AccessLogo", StringComparison.Ordinal);
+        if (access)
+            return new CloudflareAccessException(Host, ExtraHeaders.ContainsKey("CF-Access-Client-Id"));
+        return new HttpProxmoxException((int)res.StatusCode,
+            L.F("%@ answered with a web page instead of the Proxmox API (HTTP %d). Is there a login page or a proxy in front of it?",
+                Host, (int)res.StatusCode));
     }
 
     /// <summary>"message" and, for "Parameter verification failed.", one line per parameter from

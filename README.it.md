@@ -232,8 +232,13 @@ TCP, che l'app per Windows raggiunge da sola via WebSocket (senza WARP né `clou
    (e `cloudflared tunnel route dns <tunnel> spice.example.com`).
 2. In Chili, modifica il server e inserisci `spice.example.com` in **Tunnel SPICE**.
 
-Non mettere un login di Cloudflare Access sul nome host SPICE: Chili non può superarlo. Lo spiceproxy
-accetta comunque solo i ticket monouso che Proxmox rilascia agli utenti autenticati.
+Lo spiceproxy accetta comunque solo i ticket monouso che Proxmox rilascia agli utenti autenticati.
+
+**Dietro Cloudflare Access?** (per ora nell'app per Windows; macOS a seguire.) Chili non può compilare la pagina di login di Access nel browser. Crea un
+service token (*Zero Trust → Access → Service credentials → Service Tokens*), aggiungi alle applicazioni
+Access che proteggono i nomi host di Proxmox e di SPICE una policy con azione **Service Auth** che lo
+includa, e inserisci Client ID e Client Secret in **Accesso remoto (Cloudflare)** nelle impostazioni del
+server. Chili li invia con ogni richiesta e al tunnel SPICE.
 
 ### Aprire le console dall'interfaccia web di Proxmox
 

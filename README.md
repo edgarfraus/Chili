@@ -228,8 +228,13 @@ reaches over WebSocket by itself, on macOS and Windows (no WARP or `cloudflared`
    (and `cloudflared tunnel route dns <tunnel> spice.example.com`).
 2. In Chili, edit the server and enter `spice.example.com` under **SPICE tunnel**.
 
-Don't put a Cloudflare Access login on the SPICE hostname: Chili can't pass it. The spiceproxy itself
-only accepts the one-time tickets Proxmox issues to logged-in users.
+The spiceproxy itself only accepts the one-time tickets Proxmox issues to logged-in users.
+
+**Behind Cloudflare Access?** (Windows app for now; macOS next.) Chili can't fill in Access' browser login page. Create a service token
+(*Zero Trust → Access → Service credentials → Service Tokens*), add a policy with the action **Service Auth**
+that includes it to the Access application(s) protecting the Proxmox and SPICE hostnames, and enter its
+Client ID and Client Secret under **Remote access (Cloudflare)** in the server settings. Chili sends them
+with every request and to the SPICE tunnel.
 
 ### Opening consoles from the Proxmox web UI
 

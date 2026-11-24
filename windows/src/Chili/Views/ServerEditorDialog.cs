@@ -25,6 +25,8 @@ public sealed class ServerEditorDialog : ContentDialog
     private readonly PasswordBox secret = new();
     private readonly CheckBox remember = new() { Content = L.T("Remember in Credential Manager") };
     private readonly TextBox tunnel = new() { PlaceholderText = "spice.example.com" };
+    private readonly TextBox accessId = new() { PlaceholderText = "0123abcd….access" };
+    private readonly PasswordBox accessSecret = new();
     private readonly TextBlock tunnelHint = new()
     {
         Text = L.T("Only if Proxmox is reachable through a Cloudflare Tunnel: the hostname of the tunnel's TCP service for spiceproxy (service: tcp://localhost:3128). Leave empty otherwise."),
@@ -43,7 +45,12 @@ public sealed class ServerEditorDialog : ContentDialog
 
     public ServerProfile Result { get; private set; }
     public string? Secret => secret.Password.Length > 0 ? secret.Password : null;
+    public string? AccessSecret => accessSecret.Password.Length > 0 ? accessSecret.Password : null;
     public bool Removed { get; private set; }
+    private readonly Expander expander;
+
+    /// <summary>Debug actions: show the remote-access section.</summary>
+    public void ExpandRemoteAccess() => expander.IsExpanded = true;
 
     public ServerEditorDialog(AppModel model, ServerProfile? profile)
     {
@@ -68,9 +75,11 @@ public sealed class ServerEditorDialog : ContentDialog
         tokenId.Text = original.TokenId;
         remember.IsChecked = original.RememberSecret;
         tunnel.Text = original.SpiceTunnelHost;
+        accessId.Text = original.AccessClientId;
+        if (original.AccessClientId.Length > 0) accessSecret.PlaceholderText = L.T("unchanged");
         if (!isNew) secret.PlaceholderText = L.T("unchanged");
 
-        var grid = new Grid { ColumnSpacing = 12, RowSpacing = 10, Width = 440 };
+        var grid = new Grid { ColumnSpacing = 12, RowSpacing = 10 };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         int row = 0;
@@ -93,12 +102,43 @@ public sealed class ServerEditorDialog : ContentDialog
         var secretRow = Row(L.T("Password"), secret);
         Row(null, remember);
         var hintRow = Row(null, tokenHint);
-        Row(L.T("SPICE tunnel"), tunnel);
-        Row(null, tunnelHint);
         passwordRows = [.. userRow, .. realmRow];
         tokenRows = [.. tokenRow, .. hintRow];
         secretLabel = (TextBlock)secretRow[0];
-        Content = grid;
+
+        // Remote access through Cloudflare: SPICE tunnel and Access service token. Collapsed
+        // unless something is configured, to keep the dialog short.
+        var remote = new Grid { ColumnSpacing = 12, RowSpacing = 10 };
+        remote.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+        remote.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        int r = 0;
+        void RemoteRow(string? label, FrameworkElement control)
+        {
+            remote.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var text = new TextBlock
+            {
+                Text = label ?? "", VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right,
+                TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right,
+            };
+            Grid.SetRow(text, r); Grid.SetRow(control, r); Grid.SetColumn(control, 1);
+            remote.Children.Add(text); remote.Children.Add(control);
+            r++;
+        }
+        RemoteRow(L.T("SPICE tunnel"), tunnel);
+        RemoteRow(null, tunnelHint);
+        RemoteRow(L.T("Access Client ID"), accessId);
+        RemoteRow(L.T("Access Client Secret"), accessSecret);
+        RemoteRow(null, Form.Caption(L.T("Only if Cloudflare Access protects the server: a service token (Zero Trust → Access → Service credentials) allowed by a Service Auth policy. Sent with every request and to the SPICE tunnel.")));
+        expander = new Expander
+        {
+            Header = L.T("Remote access (Cloudflare)"), Content = remote,
+            HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            IsExpanded = original.SpiceTunnelHost.Length > 0 || original.AccessClientId.Length > 0,
+        };
+        var page = new StackPanel { Spacing = 14, Width = 440 };
+        page.Children.Add(grid);
+        page.Children.Add(expander);
+        Content = page;
 
         FillRealms();
         method.SelectionChanged += (_, _) => UpdateMode();
@@ -181,6 +221,7 @@ public sealed class ServerEditorDialog : ContentDialog
             TokenId = tokenId.Text.Trim(),
             RememberSecret = remember.IsChecked == true,
             SpiceTunnelHost = tunnel.Text.Trim(),
+            AccessClientId = accessId.Text.Trim(),
         };
     }
 }

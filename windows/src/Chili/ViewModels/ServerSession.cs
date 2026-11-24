@@ -39,6 +39,7 @@ public sealed partial class ServerSession : ObservableObject
         Profile = profile;
         this.app = app;
         client = new ProxmoxClient(profile.Host, profile.Port, app.Settings);
+        foreach (var (k, v) in AccessHeaders(profile)) client.ExtraHeaders[k] = v;
         ShowStopped = app.Settings.Preferences.ShowStoppedVMs;
         if (Demo.IsOn)
         {
@@ -136,7 +137,19 @@ public sealed partial class ServerSession : ObservableObject
 
     /// <summary>The local end of the Cloudflare Tunnel to spiceproxy, if this server uses one.</summary>
     public TcpOverWebSocket? SpiceTunnel =>
-        Profile.SpiceTunnelHost.Trim().Length == 0 ? null : spiceTunnel ??= new TcpOverWebSocket(Profile.SpiceTunnelHost);
+        Profile.SpiceTunnelHost.Trim().Length == 0 ? null : spiceTunnel ??= new TcpOverWebSocket(Profile.SpiceTunnelHost, AccessHeaders(Profile));
+
+    /// <summary>Cloudflare Access service token headers for this server, if it has one.</summary>
+    public static Dictionary<string, string> AccessHeaders(ServerProfile profile)
+    {
+        var headers = new Dictionary<string, string>();
+        if (profile.AccessClientId.Trim().Length > 0 && Credentials.Load(profile.Id, "access") is { Length: > 0 } secret)
+        {
+            headers["CF-Access-Client-Id"] = profile.AccessClientId.Trim();
+            headers["CF-Access-Client-Secret"] = secret;
+        }
+        return headers;
+    }
 
     /// <summary>A SPICE ticket for the VM, routed through the Cloudflare Tunnel when configured.</summary>
     public async Task<ViewerConfig> SpiceConfigAsync(ProxmoxVM vm)

@@ -26,8 +26,12 @@ public sealed class AppModel
         return s;
     }
 
-    public void Save(ServerProfile profile, string? secret)
+    /// <param name="accessSecret">New Cloudflare Access client secret, or null to keep the stored one.</param>
+    public void Save(ServerProfile profile, string? secret, string? accessSecret = null)
     {
+        // The service token is needed to reach the server at all: always kept (not tied to RememberSecret).
+        if (profile.AccessClientId.Trim().Length == 0) Credentials.Delete(profile.Id, "access");
+        else if (!string.IsNullOrEmpty(accessSecret)) Credentials.Save(profile.Id, accessSecret, "access");
         Settings.Upsert(profile);
         if (!profile.RememberSecret) Credentials.Delete(profile.Id);
         else if (!string.IsNullOrEmpty(secret)) Credentials.Save(profile.Id, secret);
@@ -39,6 +43,7 @@ public sealed class AppModel
     {
         Settings.Remove(profile);
         Credentials.Delete(profile.Id);
+        Credentials.Delete(profile.Id, "access");
         if (sessions.Remove(profile.Id, out var old)) old.Stop();
         ServersChanged?.Invoke();
     }

@@ -268,9 +268,10 @@ public sealed partial class MainWindow : Window
 
     private async void OnAddServer(object sender, TappedRoutedEventArgs e) => await EditServerAsync(null);
 
-    public async Task EditServerAsync(ServerProfile? profile)
+    public async Task EditServerAsync(ServerProfile? profile, bool expandRemote = false)
     {
         var editor = new ServerEditorDialog(model, profile);
+        if (expandRemote) editor.ExpandRemoteAccess();
         var result = await ShowDialogAsync(editor);
         if (editor.Removed)
         {
@@ -278,7 +279,7 @@ public sealed partial class MainWindow : Window
         }
         else if (result == ContentDialogResult.Primary)
         {
-            model.Save(editor.Result, editor.Secret);
+            model.Save(editor.Result, editor.Secret, editor.AccessSecret);
             shownTag = null;
             BuildMenu(ServerTag(editor.Result));
         }
@@ -330,6 +331,9 @@ public sealed partial class MainWindow : Window
         {
             case "editor":
                 await EditServerAsync(null);
+                break;
+            case "edit-remote":
+                if (model.Settings.Servers.FirstOrDefault() is { } pr) await EditServerAsync(pr, expandRemote: true);
                 break;
             case "edit":
                 if (model.Settings.Servers.FirstOrDefault() is { } p) await EditServerAsync(p);

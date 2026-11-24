@@ -21,6 +21,8 @@ by GitHub Actions.
 - **SPICE through a Cloudflare Tunnel** without WARP or cloudflared on the PC: publish the spiceproxy
   (`tcp://localhost:3128`) on its own hostname and enter it under *SPICE tunnel* in the server settings
   (see the README, *Network requirements*).
+- **Cloudflare Access** supported with a service token (Client ID + Secret in *Remote access (Cloudflare)*);
+  an Access login page is now reported as such instead of showing its HTML.
 - English and Italian.
 
 Not yet on Windows: noVNC, container consoles and the node shell open in your browser (Proxmox asks you to

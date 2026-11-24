@@ -389,3 +389,91 @@ public class UpdateTests
     public void Sha256Files() =>
         Assert.Equal("abc123", Updates.ParseSha256("abc123  Chili-1.0.1-x64-setup.exe"));
 }
+
+public class CloudflareAccessTests
+{
+    /// <summary>A local stand-in for a hostname behind Cloudflare Access.</summary>
+    private static async Task<(T Result, List<System.Collections.Specialized.NameValueCollection> Requests)> WithServer<T>(
+        Action<System.Net.HttpListenerContext> respond, Func<ProxmoxClient, Task<T>> run)
+    {
+        var l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        l.Start();
+        int port = ((System.Net.IPEndPoint)l.LocalEndpoint).Port;
+        l.Stop();
+        using var http = new System.Net.HttpListener();
+        http.Prefixes.Add($"http://localhost:{port}/");
+        http.Start();
+        var requests = new List<System.Collections.Specialized.NameValueCollection>();
+        _ = Task.Run(async () =>
+        {
+            while (http.IsListening)
+            {
+                System.Net.HttpListenerContext ctx;
+                try { ctx = await http.GetContextAsync(); } catch { return; }
+                lock (requests) requests.Add(ctx.Request.Headers);
+                respond(ctx);
+                ctx.Response.Close();
+            }
+        });
+        using var client = new ProxmoxClient("localhost", port, new NoTrust()) { Scheme = "http" };
+        client.ExtraHeaders["CF-Access-Client-Id"] = "id.access";
+        client.ExtraHeaders["CF-Access-Client-Secret"] = "s3cret";
+        return (await run(client), requests);
+    }
+
+    private static void Html(System.Net.HttpListenerContext ctx, int status, string body)
+    {
+        ctx.Response.StatusCode = status;
+        ctx.Response.ContentType = "text/html; charset=utf-8";
+        var b = Encoding.UTF8.GetBytes(body);
+        ctx.Response.OutputStream.Write(b);
+    }
+
+    [Fact]
+    public async Task AccessPageBecomesAClearError()
+    {
+        var (error, requests) = await WithServer(
+            ctx => Html(ctx, 403, "<!doctype html><style>.base_AccessLogo .logo-light{display:none}</style>"),
+            async c => await Record.ExceptionAsync(() => c.RealmsAsync()));
+        Assert.IsType<CloudflareAccessException>(error);
+        Assert.True(((CloudflareAccessException)error!).TokenSent);
+        Assert.Equal("id.access", requests[0]["CF-Access-Client-Id"]);
+        Assert.Equal("s3cret", requests[0]["CF-Access-Client-Secret"]);
+    }
+
+    [Fact]
+    public async Task RedirectToAccessLoginIsRecognised()
+    {
+        var (error, _) = await WithServer(ctx =>
+        {
+            ctx.Response.StatusCode = 302;
+            ctx.Response.RedirectLocation = "https://team.cloudflareaccess.com/cdn-cgi/access/login/pve.example.com";
+        }, async c => await Record.ExceptionAsync(() => c.RealmsAsync()));
+        Assert.IsType<CloudflareAccessException>(error);
+    }
+
+    [Fact]
+    public async Task OtherWebPagesAreReportedAsSuch()
+    {
+        var (error, _) = await WithServer(ctx => Html(ctx, 200, "<html><body>Router login</body></html>"),
+                                          async c => await Record.ExceptionAsync(() => c.RealmsAsync()));
+        var e = Assert.IsType<HttpProxmoxException>(error);
+        Assert.Contains("web page", e.Message);
+    }
+
+    [Fact]
+    public async Task JsonStillWorks()
+    {
+        var (realms, _) = await WithServer(ctx =>
+        {
+            ctx.Response.ContentType = "application/json;charset=UTF-8";
+            ctx.Response.OutputStream.Write(Encoding.UTF8.GetBytes("""{"data":[{"realm":"pam","comment":"Linux PAM"}]}"""));
+        }, c => c.RealmsAsync());
+        Assert.Equal("pam", Assert.Single(realms).Realm);
+    }
+
+    private sealed class NoTrust : ITrustStore
+    {
+        public bool IsTrusted(string host, int port, string fingerprint) => false;
+    }
+}

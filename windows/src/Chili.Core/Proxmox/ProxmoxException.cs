@@ -33,3 +33,13 @@ public sealed class HttpProxmoxException(int status, string detail)
         : detail.Length == 0 ? L.F("Server error (HTTP %d).", status)
         : detail;
 }
+
+/// <summary>Cloudflare Access answered instead of Proxmox: a service token is needed (or the
+/// one configured was refused).</summary>
+public sealed class CloudflareAccessException(string host, bool tokenSent)
+    : ProxmoxException(tokenSent
+        ? L.F("Cloudflare Access refused the service token for %@. Check the Client ID and Secret, and that the Access application has a Service Auth policy that includes this token.", host)
+        : L.F("%@ is protected by Cloudflare Access, which Chili can't log in to with a browser page. Create a service token in Cloudflare Zero Trust, allow it with a Service Auth policy, and enter it in the server settings, under Remote access (Cloudflare).", host))
+{
+    public bool TokenSent { get; } = tokenSent;
+}
