@@ -1,14 +1,18 @@
-### What's new in 1.1.0
+### What's new in 1.1.1
 
-From this version on, **one release carries both apps**: the Mac DMGs and the Windows installer share a
-version number and are published together.
+- **SPICE tunnel through any WebSocket bridge**, not only a Cloudflare Tunnel: it also works with
+  **websockify** on the Proxmox node when only HTTP(S) ports are open (tested). In the server settings the
+  section is now called *SPICE tunnel (WebSocket)*; see the README, *Network requirements*.
+- **Windows: Info page** at the bottom of the sidebar — version, *Check for Updates* (also with automatic
+  checks off), links to the release notes, issues and source, the bundled components and their versions,
+  and buttons that open the settings and logs folders.
 
-- **Windows users:** install this version by hand once (download the setup below and run it over the
-  existing install; servers and settings are kept). Earlier Windows versions look for the old separate
-  `windows-v…` releases and won't see this one; from 1.1.0 on, **Update Now** works again.
-- **Mac users:** nothing changes; **Update Now** in the banner at the top of the window installs it.
-- Same features on both systems: SPICE console, Cloudflare Tunnel and Cloudflare Access, automatic updates,
-  English and Italian.
+One release carries both apps: the Mac DMGs and the Windows installer share a version number.
+
+- **Windows users still on a `windows-v1.0.x` version:** install this one by hand once (download the setup
+  below and run it over the existing install; servers and settings are kept). From 1.1.0 on, **Update Now**
+  finds new versions by itself.
+- **Mac users** and Windows users on 1.1.0: **Update Now** in the banner at the top of the window installs it.
 
 ### Download
 
