@@ -63,11 +63,20 @@ private struct Sidebar: View {
         .background(Demo.isOn ? Color(nsColor: .underPageBackgroundColor) : Color.clear)
         .frame(minWidth: 200)
         .safeAreaInset(edge: .bottom) {
-            Button {
-                model.editingProfile = ServerProfile()
-            } label: {
-                Label("Add Server…", systemImage: "plus")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            HStack {
+                Button {
+                    model.editingProfile = ServerProfile()
+                } label: {
+                    Label("Add Server…", systemImage: "plus")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                Button {
+                    model.selection = .info
+                } label: {
+                    Label("Info", systemImage: "info.circle")
+                        .foregroundColor(model.selection == .info ? .accentColor : .primary)
+                }
+                .help("Version, updates, components")
             }
             .buttonStyle(.borderless)
             .padding(10)
@@ -118,6 +127,8 @@ private struct DetailView: View {
             } else {
                 Placeholder()
             }
+        case .info:
+            InfoView()
         case nil:
             Placeholder()
         }

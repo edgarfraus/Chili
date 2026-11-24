@@ -168,8 +168,22 @@ final class Updater: NSObject, ObservableObject {
         }
     }
 
+    /// When the last check finished, and why it failed (nil: it worked). Shown on the Info page.
+    @Published private(set) var lastChecked: Date?
+    @Published private(set) var lastError: String?
+    @Published private(set) var isChecking = false
+
+    /// Scheduled check: only when automatic checks are on.
     func check() async {
         guard UserDefaults.standard.bool(forKey: Prefs.checkForUpdates) else { return }
+        await checkNow()
+    }
+
+    /// Checks right away, whatever the preference (Info page). Announces a release not announced yet.
+    func checkNow() async {
+        guard !Demo.isOn, !isChecking else { return }
+        isChecking = true
+        defer { isChecking = false }
         do {
             let url = URL(string: "https://api.github.com/repos/\(Updates.repository)/releases?per_page=30")!
             let (data, response) = try await session.data(from: url)
@@ -179,12 +193,15 @@ final class Updater: NSObject, ObservableObject {
             let list = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
             let release = Updates.newest(in: list, current: Self.current, arch: Updates.arch)
             log("update check: current \(Updates.format(Self.current)), latest \(release?.tag ?? "none newer")")
+            lastChecked = Date()
+            lastError = nil
             guard let release, release != pending else { return }
             pending = release
             phase = .available
             dismissed = false
         } catch {
             log("update check failed: \(error.localizedDescription)")   // offline, rate-limited…: try again later
+            lastError = error.localizedDescription
         }
     }
 

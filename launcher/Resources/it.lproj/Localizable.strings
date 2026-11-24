@@ -355,3 +355,29 @@
 "Check for updates automatically" = "Controlla automaticamente gli aggiornamenti";
 "Chili can't replace itself in this folder. Drag Chili from the disk image that just opened to your Applications folder." = "Chili non può sostituirsi in questa cartella. Trascina Chili dall'immagine disco appena aperta nella cartella Applicazioni.";
 "The connection timed out." = "Tempo scaduto per la connessione.";
+
+/* Info page */
+"Info" = "Info";
+"Version %@ (%@)" = "Versione %@ (%@)";
+"An unofficial SPICE client and Proxmox VE companion" = "Un client SPICE non ufficiale e un compagno per Proxmox VE";
+"Updates" = "Aggiornamenti";
+"Check for Updates" = "Controlla aggiornamenti";
+"Checking…" = "Controllo in corso…";
+"Chili is up to date (checked at %@)." = "Chili è aggiornato (controllato alle %@).";
+"Couldn't check for updates: %@" = "Impossibile controllare gli aggiornamenti: %@";
+"Not checked yet." = "Non ancora controllato.";
+"Updates are not checked in this mode." = "In questa modalità gli aggiornamenti non vengono controllati.";
+"Links" = "Link";
+"Project page" = "Pagina del progetto";
+"What's new in this version" = "Novità di questa versione";
+"All releases" = "Tutte le release";
+"Report a problem" = "Segnala un problema";
+"Source code" = "Codice sorgente";
+"Components" = "Componenti";
+"Chili is free software under the GNU GPL, version 2 or later. Each release ships the source of every bundled component." = "Chili è software libero con licenza GNU GPL, versione 2 o successiva. Ogni release include il sorgente di ogni componente incluso.";
+"Folders" = "Cartelle";
+"Logs" = "Log";
+"Program" = "Programma";
+"Version, updates, components" = "Versione, aggiornamenti, componenti";
+"This is a development build: updates are downloaded and verified, not installed." = "Questa è una build di sviluppo: gli aggiornamenti vengono scaricati e verificati, non installati.";
+"Passwords and tokens are kept in your login Keychain." = "Password e token sono conservati nel portachiavi di login.";

@@ -116,6 +116,14 @@ release, and that the macOS release stays "Latest".
 
 ## 4b. Info page (added on Windows, 2026-11-24)
 
+**Done on macOS (2026-11-24):** `launcher/Sources/InfoView.swift`, an *Info* button at the bottom of the sidebar
+(next to *Add Server…*) and *About Chili* in the app menu open it. Components come from
+`Contents/Resources/COMPONENTS.txt`, written by `scripts/components.sh` (from the pins in `build-stack.sh`) in
+`bundle-app.sh`. `Updater.checkNow()` ignores the preference and records `lastChecked` / `lastError`. Shared
+Italian strings moved to `it.lproj`; the Windows-only ones stay in `it.windows.strings`. Debug action `info`.
+Checked in demo and with a real check against GitHub (offscreen snapshots can't draw the sidebar: check the
+Info button there by eye).
+
 Windows now has an **Info** item at the bottom of the sidebar (`windows/src/Chili/Views/InfoView.cs`): version
 and architecture; updates (status line, *Check for Updates* that works even with automatic checks off, the
 *Check for updates automatically* preference, *Update Now* when a newer release is known); links (project page,

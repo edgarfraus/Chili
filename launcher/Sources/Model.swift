@@ -5,6 +5,7 @@ enum SidebarItem: Hashable {
     case quickConnect
     case server(UUID)
     case console(UUID)
+    case info
 }
 
 struct AlertInfo: Identifiable {

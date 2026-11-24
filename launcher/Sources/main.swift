@@ -115,6 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         if action == "settings" { showSettings(); return }
+        if action == "info" { model.selection = .info; Task { await model.updater.checkNow() }; return }
         if action == "update" {   // check GitHub now, then Update Now (with CHILI_DEBUG_UPDATE_CURRENT=0.9.0)
             Task {
                 await model.updater.check()
@@ -316,6 +317,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         model.selection = .quickConnect
     }
 
+    /// About Chili: the Info page in the main window.
+    @objc func showInfo(_ sender: Any?) {
+        showMainWindow()
+        model.selection = .info
+    }
+
     @objc func openGuide(_ sender: Any?) {
         NSWorkspace.shared.open(AppInfo.guideURL)
     }
@@ -346,7 +353,7 @@ enum MainMenu {
         }
 
         let app = NSMenu(title: name)
-        app.addItem(item(String(format: L("About %@"), name), #selector(NSApplication.orderFrontStandardAboutPanel(_:))))
+        app.addItem(item(String(format: L("About %@"), name), #selector(AppDelegate.showInfo(_:)), "", .command, target))
         app.addItem(.separator())
         app.addItem(item(L("Settings…"), #selector(AppDelegate.showSettings), ",", .command, target))
         app.addItem(.separator())

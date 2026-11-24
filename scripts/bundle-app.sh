@@ -47,6 +47,7 @@ msg "Compiling launcher"
 render "$REPO_ROOT/resources/Info.plist.in" "$APP/Contents/Info.plist"
 cp "$REPO_ROOT/resources/AppIcon.icns" "$APP/Contents/Resources/"
 cp -R "$REPO_ROOT"/launcher/Resources/*.lproj "$APP/Contents/Resources/"
+"$REPO_ROOT/scripts/components.sh" > "$APP/Contents/Resources/COMPONENTS.txt"   # for the Info page
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
 # --- Viewer helper ---------------------------------------------------------
