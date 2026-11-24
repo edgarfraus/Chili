@@ -1,18 +1,18 @@
-### What's new in 1.1.1
+### What's new in 1.1.2
 
-- **SPICE tunnel through any WebSocket bridge**, not only a Cloudflare Tunnel: it also works with
-  **websockify** on the Proxmox node when only HTTP(S) ports are open (tested). In the server settings the
-  section is now called *SPICE tunnel (WebSocket)*; see the README, *Network requirements*.
-- **Windows: Info page** at the bottom of the sidebar — version, *Check for Updates* (also with automatic
-  checks off), links to the release notes, issues and source, the bundled components and their versions,
-  and buttons that open the settings and logs folders.
+- **Mac: Info page**, like on Windows: the *Info* button at the bottom of the sidebar (or *About Chili* in the
+  Chili menu) shows the version, *Check for Updates* (also with automatic checks off), links to the release
+  notes, issues and source, the bundled components and their versions, and buttons for the settings and logs.
+- From 1.1.1: the **SPICE tunnel works through any WebSocket bridge**, not only a Cloudflare Tunnel (also
+  **websockify** on the Proxmox node, tested; see the README, *Network requirements*), and Windows got its
+  Info page.
 
 One release carries both apps: the Mac DMGs and the Windows installer share a version number.
 
 - **Windows users still on a `windows-v1.0.x` version:** install this one by hand once (download the setup
   below and run it over the existing install; servers and settings are kept). From 1.1.0 on, **Update Now**
   finds new versions by itself.
-- **Mac users** and Windows users on 1.1.0: **Update Now** in the banner at the top of the window installs it.
+- **Mac users** and Windows users on 1.1.0 or later: **Update Now** in the banner at the top of the window installs it.
 
 ### Download
 
