@@ -50,7 +50,26 @@ public sealed class ServerEditorDialog : ContentDialog
     private readonly Expander expander;
 
     /// <summary>Debug actions: show the remote-access section.</summary>
-    public void ExpandRemoteAccess() => expander.IsExpanded = true;
+    /// <summary>Debug actions: open the remote-access section and scroll to the end.</summary>
+    public void ExpandRemoteAccess()
+    {
+        expander.IsExpanded = true;
+        Opened += async (_, _) =>
+        {
+            await Task.Delay(400);
+            scroller.UpdateLayout();
+            scroller.ChangeView(null, scroller.ScrollableHeight, null, disableAnimation: true);
+        };
+    }
+
+    private readonly ScrollViewer scroller;
+
+    /// <summary>The dialog's title and buttons take ~200 px; the form gets the rest of the window.</summary>
+    private void FitToWindow()
+    {
+        if (XamlRoot is null) return;
+        scroller.MaxHeight = Math.Max(240, XamlRoot.Size.Height - 220);
+    }
 
     public ServerEditorDialog(AppModel model, ServerProfile? profile)
     {
@@ -138,7 +157,17 @@ public sealed class ServerEditorDialog : ContentDialog
         var page = new StackPanel { Spacing = 14, Width = 440 };
         page.Children.Add(grid);
         page.Children.Add(expander);
-        Content = page;
+        // Our own scroller: ContentDialog doesn't re-measure when the expander grows after it opened,
+        // which left the Access fields below the bottom edge, unreachable.
+        scroller = new ScrollViewer
+        {
+            Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Padding = new Thickness(0, 0, 16, 0),   // room for the scroll bar
+        };
+        Content = scroller;
+        Opened += (_, _) => { FitToWindow(); XamlRoot.Changed += (_, _) => FitToWindow(); };
+        expander.Expanding += (_, _) => DispatcherQueue.TryEnqueue(() =>
+            scroller.ChangeView(null, scroller.ScrollableHeight, null));
 
         FillRealms();
         method.SelectionChanged += (_, _) => UpdateMode();
