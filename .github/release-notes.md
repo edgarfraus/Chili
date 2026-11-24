@@ -1,10 +1,13 @@
-### What's new in 1.0.1
+### What's new in 1.0.2
 
-- **Automatic updates**: Chili checks GitHub for new releases and installs them with **Update Now**
-  (can be turned off in Settings). From this version on, updating no longer means downloading the DMG.
-- **SPICE through a Cloudflare Tunnel**: if Proxmox is published with `cloudflared`, enter the hostname of
-  the tunnel's TCP service for spiceproxy under **SPICE tunnel** in the server settings. No WARP or
-  `cloudflared` needed on the Mac (see the [guide](../../#through-a-cloudflare-tunnel)).
+- **Cloudflare Access**: a Proxmox hostname protected by Access works with a service token, entered in the
+  new *Cloudflare Access* section of the server settings. Chili sends it with every API request and from
+  the noVNC and shell consoles. An Access login page (or any other login page in front of Proxmox) is now
+  reported clearly instead of as "unexpected response".
+- The SPICE tunnel moved to its own *SPICE tunnel (Cloudflare)* section, independent of Access; a checkbox
+  sends the Access token to the tunnel hostname too (see the [guide](../../#through-a-cloudflare-tunnel)).
+
+Updating from 1.0.1: **Update Now** in the banner at the top of the window.
 
 ### Download
 

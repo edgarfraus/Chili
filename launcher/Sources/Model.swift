@@ -37,7 +37,14 @@ final class AppModel: ObservableObject {
         return s
     }
 
-    func save(_ profile: ServerProfile, secret: String?) {
+    /// - Parameter accessSecret: new Cloudflare Access client secret, or nil to keep the stored one.
+    func save(_ profile: ServerProfile, secret: String?, accessSecret: String? = nil) {
+        // The service token is needed to reach the server at all: always kept (not tied to rememberSecret).
+        if profile.accessClientId.trimmingCharacters(in: .whitespaces).isEmpty {
+            Keychain.delete(account: profile.accessAccount)
+        } else if let accessSecret, !accessSecret.isEmpty {
+            Keychain.save(accessSecret, account: profile.accessAccount)
+        }
         profiles.upsert(profile)
         if let secret, !secret.isEmpty, profile.rememberSecret {
             Keychain.save(secret, account: profile.id.uuidString)
@@ -82,9 +89,9 @@ final class AppModel: ObservableObject {
     }
 
     /// Opens Proxmox' own web console (noVNC / xterm.js) inside Chili.
-    func openWebConsole(title: String, host: String, port: Int, placement: Placement? = nil,
-                        load: @escaping () async throws -> (URL, HTTPCookie?)) {
-        let session = ConsoleSession(webTitle: title, host: host, port: port, load: load)
+    func openWebConsole(title: String, host: String, port: Int, headers: [String: String] = [:],
+                        placement: Placement? = nil, load: @escaping () async throws -> (URL, HTTPCookie?)) {
+        let session = ConsoleSession(webTitle: title, host: host, port: port, headers: headers, load: load)
         consoles.append(session)
         let where_ = placement ?? (UserDefaults.standard.string(forKey: Prefs.consolePlacement) == "window"
                                    ? .window : .mainWindow)
@@ -192,10 +199,13 @@ final class ServerSession: ObservableObject {
     private var password = ""
     private var refreshTimer: Timer?
 
-    init(profile: ServerProfile, app: AppModel) {
+    /// - Parameter accessSecret: debug only — a Cloudflare Access secret used instead of the Keychain's.
+    init(profile: ServerProfile, app: AppModel, accessSecret: String? = nil) {
         self.profile = profile
         self.app = app
+        accessSecretOverride = accessSecret
         client = ProxmoxClient(host: profile.host, port: profile.port)
+        client.extraHeaders = Self.accessHeaders(profile, secret: accessSecret)
         if Demo.isOn {
             vms = Demo.vms
             state = .ready
@@ -267,13 +277,24 @@ final class ServerSession: ObservableObject {
     deinit { spiceTunnel?.stop() }
 
     private var spiceTunnel: TcpOverWebSocket?
+    private let accessSecretOverride: String?
 
     /// The local end of the Cloudflare Tunnel to spiceproxy, if this server uses one.
     var tunnel: TcpOverWebSocket? {
         let host = profile.spiceTunnelHost.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !host.isEmpty else { return nil }
-        if spiceTunnel == nil { spiceTunnel = TcpOverWebSocket(host: host) }
+        if spiceTunnel == nil { spiceTunnel = TcpOverWebSocket(host: host, headers: Self.accessHeaders(profile, spice: true, secret: accessSecretOverride)) }
         return spiceTunnel
+    }
+
+    /// Cloudflare Access service token headers for the Proxmox hostname, or (spice) for the SPICE
+    /// tunnel hostname when the user chose to send the token there too.
+    static func accessHeaders(_ profile: ServerProfile, spice: Bool = false, secret override: String? = nil) -> [String: String] {
+        if spice && !profile.spiceTunnelUsesAccess { return [:] }
+        let id = profile.accessClientId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !id.isEmpty, !Demo.isOn, let secret = override ?? Keychain.load(account: profile.accessAccount), !secret.isEmpty
+        else { return [:] }
+        return ["CF-Access-Client-Id": id, "CF-Access-Client-Secret": secret]
     }
 
     /// A SPICE ticket for the VM, routed through the Cloudflare Tunnel when configured.
@@ -386,7 +407,8 @@ final class ServerSession: ObservableObject {
         }
         let client = self.client
         let username = profile.fullUsername
-        app?.openWebConsole(title: title, host: client.host, port: client.port, placement: placement) {
+        app?.openWebConsole(title: title, host: client.host, port: client.port, headers: client.extraHeaders,
+                            placement: placement) {
             try? await client.renewTicket(username: username)
             return (try client.webConsoleURL(kind), client.authCookie())
         }

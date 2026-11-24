@@ -3,8 +3,8 @@
 Chili is an unofficial SPICE client and Proxmox VE companion. The macOS app is released (v1.0.0); the
 **Windows version** is in progress in `windows/` — see [`docs/windows/PLAN.md`](docs/windows/PLAN.md) and
 the status at the end.
-**macOS** caught up with Windows on 2026-11-23 (SPICE through a Cloudflare Tunnel, automatic updates; see
-[`docs/macos/HANDOFF.md`](docs/macos/HANDOFF.md)); next: release v1.0.1.
+**macOS** caught up with Windows on 2026-11-23 (SPICE through a Cloudflare Tunnel, automatic updates, v1.0.1 released; Cloudflare Access on 2026-11-24; see
+[`docs/macos/HANDOFF.md`](docs/macos/HANDOFF.md)); next: release v1.0.2.
 
 ## Working with the maintainer
 
@@ -45,7 +45,9 @@ untouched), `CHILI_DEBUG_NO_LOGIN=1`, `CHILI_DEBUG_SNAPSHOT=<dir>` (PNG of the a
 needs no screen-recording permission), `CHILI_DEBUG_ACTION=…` (see `runDebugAction` in `main.swift`:
 `inventory`, `create:<variant>`, `ctcreate`, `cleanup`, `tasklog:<id>`, `journal`, `wizard[-win][-custom]`,
 `ctwizard`, `logs`, `syslog`, `opentest`, `closetest`, `quickdump`, `novnc:<id>`, `spice:<id>`, `shell`,
-`spicetunnel:<id>` (console through an in-process Cloudflare-like WebSocket bridge), `update`, `editor`, `settings`).
+`spicetunnel:<id>[:access]` (console through an in-process Cloudflare-like WebSocket bridge; `access` adds a made-up
+Access service token and checks the API, the tunnel handshakes and noVNC carry it), `accesscheck` (offline:
+how login pages are classified), `update`, `editor`, `editor-cf`, `settings`).
 `CHILI_DEBUG_UPDATE_CURRENT=0.9.0` pretends an older version for the update check. Each rebuilt (ad-hoc signed)
 binary triggers a Keychain prompt the maintainer must approve; `CHILI_DEBUG_NO_LOGIN=1` avoids it for UI work.
 

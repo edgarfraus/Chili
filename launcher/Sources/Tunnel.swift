@@ -9,6 +9,8 @@ import Network
 /// Same design as the Windows app (`TcpOverWebSocket.cs`).
 final class TcpOverWebSocket: NSObject, URLSessionWebSocketDelegate {
     let endpoint: URL
+    /// Sent with every WebSocket handshake (a Cloudflare Access service token, when chosen).
+    let headers: [String: String]
     private let queue = DispatchQueue(label: "chili.tunnel")
     private var listener: NWListener?
     private var startWaiters: [CheckedContinuation<UInt16, Error>] = []
@@ -29,8 +31,9 @@ final class TcpOverWebSocket: NSObject, URLSessionWebSocketDelegate {
     var bridgedCount: Int { lock.lock(); defer { lock.unlock() }; return _bridged }
 
     /// - Parameter host: hostname of the tunnel's TCP service, e.g. "spice.example.com" (or a wss:// URL).
-    init(host: String) {
+    init(host: String, headers: [String: String] = [:]) {
         endpoint = Self.endpoint(for: host)
+        self.headers = headers
         super.init()
     }
 
@@ -128,7 +131,9 @@ final class TcpOverWebSocket: NSObject, URLSessionWebSocketDelegate {
     }
 
     private func accept(_ tcp: NWConnection) {
-        let ws = urlSession.webSocketTask(with: endpoint)
+        var request = URLRequest(url: endpoint)
+        for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
+        let ws = urlSession.webSocketTask(with: request)
         ws.maximumMessageSize = 16 * 1024 * 1024
         let id = ws.taskIdentifier
         let pipe = Pipe(tcp: tcp, ws: ws) { [weak self] in self?.pipes[id] = nil }

@@ -105,7 +105,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         if action == "dump" { dumpMainWindow(); return }
+        if action == "accesscheck" { DebugActions.accessCheck(); return }
         if action == "editor" { model.editingProfile = model.profiles.profiles.first ?? ServerProfile(); return }
+        if action == "editor-cf" {   // with Cloudflare Access and the SPICE tunnel filled in (sections open)
+            var p = model.profiles.profiles.first ?? ServerProfile()
+            p.accessClientId = "0123abcd.access"
+            p.spiceTunnelHost = "spice.example.com"
+            model.editingProfile = p
+            return
+        }
         if action == "settings" { showSettings(); return }
         if action == "update" {   // check GitHub now, then Update Now (with CHILI_DEBUG_UPDATE_CURRENT=0.9.0)
             Task {
@@ -185,7 +193,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         case "novnc": if let vm { session.openWebConsole(.vm(vm)) }
         case "spice": if let vm { session.connect(vm) }
-        case "spicetunnel": whenReady { await DebugActions.spiceTunnel(app: self.model, real: session, vmid: parts.count > 1 ? parts[1] : "") }
+        case "spicetunnel": whenReady { await DebugActions.spiceTunnel(app: self.model, real: session, vmid: parts.count > 1 ? parts[1] : "",
+                                                                       access: parts.contains("access")) }
         case "shell": if let node = session.vms.first?.node { session.openWebConsole(.nodeShell(node)) }
         default: break
         }

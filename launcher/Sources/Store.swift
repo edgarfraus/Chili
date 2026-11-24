@@ -20,9 +20,17 @@ struct ServerProfile: Identifiable, Codable, Hashable {
     /// Hostname of a Cloudflare Tunnel TCP service for spiceproxy (port 3128), when the server is only
     /// reachable through the tunnel. Empty: SPICE goes to host:3128 directly.
     var spiceTunnelHost = ""
+    /// Client ID of a Cloudflare Access service token for the Proxmox hostname (API and web consoles);
+    /// the secret is in the Keychain (`accessAccount`).
+    var accessClientId = ""
+    /// Send that service token to the SPICE tunnel hostname too (when it is behind Access as well).
+    /// The tunnel and Access otherwise work independently of each other.
+    var spiceTunnelUsesAccess = true
 
     var title: String { name.isEmpty ? host : name }
     var fullUsername: String { username.contains("@") ? username : "\(username)@\(realm)" }
+    /// Keychain account of the Cloudflare Access client secret.
+    var accessAccount: String { id.uuidString + ".access" }
 }
 
 extension ServerProfile {
@@ -40,6 +48,8 @@ extension ServerProfile {
         tokenID = try c.decodeIfPresent(String.self, forKey: .tokenID) ?? d.tokenID
         rememberSecret = try c.decodeIfPresent(Bool.self, forKey: .rememberSecret) ?? d.rememberSecret
         spiceTunnelHost = try c.decodeIfPresent(String.self, forKey: .spiceTunnelHost) ?? d.spiceTunnelHost
+        accessClientId = try c.decodeIfPresent(String.self, forKey: .accessClientId) ?? d.accessClientId
+        spiceTunnelUsesAccess = try c.decodeIfPresent(Bool.self, forKey: .spiceTunnelUsesAccess) ?? d.spiceTunnelUsesAccess
     }
 }
 
@@ -79,6 +89,7 @@ final class ProfileStore: ObservableObject {
     func delete(_ profile: ServerProfile) {
         profiles.removeAll { $0.id == profile.id }
         Keychain.delete(account: profile.id.uuidString)
+        Keychain.delete(account: profile.accessAccount)
     }
 }
 

@@ -24,6 +24,10 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
     private let webReload: (() async throws -> (URL, HTTPCookie?))?
     /// Web: certificate pinned by the user for this server.
     private let trustedHost: (host: String, port: Int)?
+    /// Web: headers for requests to the Proxmox host (a Cloudflare Access service token). WKWebView can
+    /// only add them to navigations; Access answers with its CF_Authorization cookie, which the page's
+    /// other requests and the console WebSocket then carry.
+    private let webHeaders: [String: String]
 
     @Published private(set) var connection: CSConnection?
     @Published private(set) var state: CSConnectionState = .connecting
@@ -44,12 +48,14 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
         reconnectOptions = reconnect
         webReload = nil
         trustedHost = nil
+        webHeaders = [:]
         super.init()
         view.captureChanged = { [weak self] captured in self?.pointerCaptured = captured }
         attach(Self.makeConnection(config))
     }
 
-    init(webTitle: String, host: String, port: Int, load: @escaping () async throws -> (URL, HTTPCookie?)) {
+    init(webTitle: String, host: String, port: Int, headers: [String: String] = [:],
+         load: @escaping () async throws -> (URL, HTTPCookie?)) {
         title = webTitle
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
@@ -62,6 +68,7 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
         diagnostic = nil
         webReload = load
         trustedHost = (host, port)
+        webHeaders = headers
         super.init()
         web.navigationDelegate = self
         web.uiDelegate = self
@@ -152,16 +159,40 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
                 if let cookie {
                     await webView.configuration.websiteDataStore.httpCookieStore.setCookieAsync(cookie)
                 }
-                webView.load(URLRequest(url: url))
+                webView.load(withHeaders(URLRequest(url: url)))
             } catch {
                 state = .disconnected
                 errorMessage = error.localizedDescription
             }
         }
     }
+
+    private func withHeaders(_ request: URLRequest) -> URLRequest {
+        var r = request
+        for (k, v) in webHeaders { r.setValue(v, forHTTPHeaderField: k) }
+        return r
+    }
+
+    private func needsHeaders(_ request: URLRequest) -> Bool {
+        guard let (host, _) = trustedHost, let first = webHeaders.first,
+              request.url?.host?.lowercased() == host.trimmingCharacters(in: CharacterSet(charactersIn: "[]")).lowercased()
+        else { return false }
+        return request.value(forHTTPHeaderField: first.key) == nil
+    }
 }
 
 extension ConsoleSession: WKNavigationDelegate, WKUIDelegate {
+    /// Page navigations to the Proxmox host (reloads, redirects) without the Access headers are sent again with them.
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if navigationAction.targetFrame?.isMainFrame == true, needsHeaders(navigationAction.request) {
+            decisionHandler(.cancel)
+            webView.load(withHeaders(navigationAction.request))
+            return
+        }
+        decisionHandler(.allow)
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         state = .connected
     }
@@ -175,7 +206,9 @@ extension ConsoleSession: WKNavigationDelegate, WKUIDelegate {
     }
 
     private func webFailed(_ error: Error) {
-        if (error as NSError).code == NSURLErrorCancelled { return }
+        let e = error as NSError
+        if e.code == NSURLErrorCancelled { return }
+        if e.domain == WKErrorDomain || e.domain == "WebKitErrorDomain", e.code == 102 { return }  // our own re-load with headers
         state = .disconnected
         errorMessage = error.localizedDescription
     }

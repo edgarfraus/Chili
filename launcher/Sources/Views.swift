@@ -540,12 +540,24 @@ struct ServerEditor: View {
     @Environment(\.presentationMode) private var presentation
     @State var profile: ServerProfile
     @State private var secret = ""
+    @State private var accessSecret = ""
     @State private var realms: [ProxmoxRealm] = []
+    @State private var showAccess = false
+    @State private var showTunnel = false
+    private let hadAccess: Bool
+
+    init(profile: ServerProfile) {
+        _profile = State(initialValue: profile)
+        hadAccess = !profile.accessClientId.isEmpty
+        _showAccess = State(initialValue: !profile.accessClientId.isEmpty)
+        _showTunnel = State(initialValue: !profile.spiceTunnelHost.isEmpty)
+    }
 
     private var isNew: Bool { !model.profiles.profiles.contains { $0.id == profile.id } }
     private var canSave: Bool {
         !ProxmoxClient.normalizedHost(profile.host).isEmpty &&
-        (profile.authMethod == .password ? !profile.username.isEmpty : profile.tokenID.contains("!"))
+        (profile.authMethod == .password ? !profile.username.isEmpty : profile.tokenID.contains("!")) &&
+        (profile.accessClientId.trimmingCharacters(in: .whitespaces).isEmpty || hadAccess || !accessSecret.isEmpty)
     }
 
     var body: some View {
@@ -572,15 +584,31 @@ struct ServerEditor: View {
                     SecureField("Secret", text: $secret, prompt: isNew ? nil : Text("unchanged"))
                 }
                 Toggle("Remember in Keychain", isOn: $profile.rememberSecret)
-                TextField("SPICE tunnel", text: $profile.spiceTunnelHost, prompt: Text(verbatim: "spice.example.com"))
             }
-            Text("Only if Proxmox is reachable through a Cloudflare Tunnel: the hostname of the tunnel's TCP service for spiceproxy (service: tcp://localhost:3128). Leave empty otherwise.")
-                .font(.caption).foregroundColor(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             if profile.authMethod == .token {
-                Text("The token needs the VM.Console and VM.Audit privileges (and VM.PowerMgmt to start VMs).")
-                    .font(.caption).foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                caption("The token needs the VM.Console and VM.Audit privileges (and VM.PowerMgmt to start VMs).")
+            }
+            DisclosureGroup("Cloudflare Access", isExpanded: $showAccess) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Form {
+                        TextField("Client ID", text: $profile.accessClientId, prompt: Text(verbatim: "0123abcd….access"))
+                        SecureField("Client Secret", text: $accessSecret, prompt: hadAccess ? Text("unchanged") : nil)
+                    }
+                    caption("Only if Cloudflare Access protects the Proxmox hostname: a service token (Zero Trust → Access → Service credentials) allowed by a Service Auth policy. Used for the API and the web consoles, and for the SPICE tunnel if ticked there.")
+                }
+                .padding(.top, 6)
+                .padding(.leading, 18)
+            }
+            DisclosureGroup("SPICE tunnel (Cloudflare)", isExpanded: $showTunnel) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Form {
+                        TextField("Hostname", text: $profile.spiceTunnelHost, prompt: Text(verbatim: "spice.example.com"))
+                    }
+                    caption("Only if Proxmox is reachable through a Cloudflare Tunnel: the hostname of the tunnel's TCP service for spiceproxy (service: tcp://localhost:3128). Leave empty otherwise.")
+                    Toggle("Use the Cloudflare Access token for the tunnel too", isOn: $profile.spiceTunnelUsesAccess)
+                }
+                .padding(.top, 6)
+                .padding(.leading, 18)
             }
             HStack {
                 if !isNew {
@@ -595,7 +623,10 @@ struct ServerEditor: View {
                 Button(isNew ? LocalizedStringKey("Add") : LocalizedStringKey("Save")) {
                     if let p = ProxmoxClient.port(in: profile.host) { profile.port = p }
                     profile.host = ProxmoxClient.normalizedHost(profile.host)
-                    model.save(profile, secret: secret.isEmpty ? nil : secret)
+                    profile.accessClientId = profile.accessClientId.trimmingCharacters(in: .whitespacesAndNewlines)
+                    profile.spiceTunnelHost = profile.spiceTunnelHost.trimmingCharacters(in: .whitespacesAndNewlines)
+                    model.save(profile, secret: secret.isEmpty ? nil : secret,
+                               accessSecret: accessSecret.isEmpty ? nil : accessSecret)
                     presentation.wrappedValue.dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -605,6 +636,10 @@ struct ServerEditor: View {
         .padding(20)
         .frame(width: 440)
         .task(id: profile.host) { await loadRealms() }
+    }
+
+    private func caption(_ text: LocalizedStringKey) -> some View {
+        Text(text).font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 
     private var realmChoices: [String] {
@@ -628,7 +663,15 @@ struct ServerEditor: View {
         guard host.count > 3 else { return }
         try? await Task.sleep(nanoseconds: 600_000_000) // debounce typing
         let port = ProxmoxClient.port(in: profile.host) ?? profile.port
-        guard let list = try? await ProxmoxClient(host: host, port: port).realms() else { return }
+        let client = ProxmoxClient(host: host, port: port)
+        var withAccess = profile
+        withAccess.accessClientId = profile.accessClientId.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !accessSecret.isEmpty, !withAccess.accessClientId.isEmpty {
+            client.extraHeaders = ["CF-Access-Client-Id": withAccess.accessClientId, "CF-Access-Client-Secret": accessSecret]
+        } else if hadAccess {
+            client.extraHeaders = ServerSession.accessHeaders(withAccess)
+        }
+        guard let list = try? await client.realms() else { return }
         realms = list
     }
 }

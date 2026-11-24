@@ -41,6 +41,10 @@ enum ProxmoxError: LocalizedError {
     case badResponse
     case noSpice
     case invalidHost(String)
+    /// Cloudflare Access answered instead of Proxmox; `tokenSent`: a service token was sent and refused.
+    case cloudflareAccess(host: String, tokenSent: Bool)
+    /// Some other login page or proxy answered with HTML or a redirect.
+    case webPage(host: String, status: Int)
 
     var errorDescription: String? {
         switch self {
@@ -56,6 +60,12 @@ enum ProxmoxError: LocalizedError {
             return NSLocalizedString("Unexpected response from the server.", comment: "")
         case .invalidHost(let host):
             return String(format: NSLocalizedString("“%@” is not a valid host name or IP address.", comment: ""), host)
+        case .cloudflareAccess(let host, true):
+            return String(format: NSLocalizedString("Cloudflare Access refused the service token for %@. Check the Client ID and Secret, and that the Access application has a Service Auth policy that includes this token.", comment: ""), host)
+        case .cloudflareAccess(let host, false):
+            return String(format: NSLocalizedString("%@ is protected by Cloudflare Access, which Chili can't log in to with a browser page. Create a service token in Cloudflare Zero Trust, allow it with a Service Auth policy, and enter it in the server settings, under Cloudflare Access.", comment: ""), host)
+        case .webPage(let host, let status):
+            return String(format: NSLocalizedString("%@ answered with a web page instead of the Proxmox API (HTTP %d). Is there a login page or a proxy in front of it?", comment: ""), host, status)
         case .noSpice:
             return NSLocalizedString("This VM has no SPICE display. In Proxmox, set Hardware → Display to “SPICE (qxl)” and restart the VM.", comment: "")
         }
@@ -63,7 +73,7 @@ enum ProxmoxError: LocalizedError {
 }
 
 /// Minimal Proxmox VE API client: just what's needed to pick a VM and get its SPICE ticket.
-final class ProxmoxClient: NSObject, URLSessionDelegate {
+final class ProxmoxClient: NSObject, URLSessionTaskDelegate {
     enum Auth {
         case ticket(ticket: String, csrf: String)
         case token(id: String, secret: String)
@@ -72,6 +82,9 @@ final class ProxmoxClient: NSObject, URLSessionDelegate {
     let host: String
     let port: Int
     private(set) var auth: Auth?
+    /// Extra headers sent with every request, e.g. a Cloudflare Access service token
+    /// (CF-Access-Client-Id / CF-Access-Client-Secret).
+    var extraHeaders: [String: String] = [:]
     private var session: URLSession!
 
     init(host: String, port: Int) {
@@ -478,6 +491,7 @@ final class ProxmoxClient: NSObject, URLSessionDelegate {
             req.httpBody = Data(body.utf8)
             req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         }
+        for (k, v) in extraHeaders { req.setValue(v, forHTTPHeaderField: k) }
         if authenticated {
             switch auth {
             case .ticket(let ticket, let csrf):
@@ -499,10 +513,40 @@ final class ProxmoxClient: NSObject, URLSessionDelegate {
             throw e
         }
         guard let http = response as? HTTPURLResponse else { throw ProxmoxError.badResponse }
+        // Proxmox' API never redirects and never answers with HTML: a login page in front of it
+        // (Cloudflare Access, a reverse proxy…) did.
+        if Self.isWebPage(http, data) { throw webPageError(http, data) }
         guard (200..<300).contains(http.statusCode) else {
             throw ProxmoxError.http(http.statusCode, Self.errorMessage(http, data))
         }
         return data
+    }
+
+    static func isWebPage(_ response: HTTPURLResponse, _ data: Data) -> Bool {
+        if (300..<400).contains(response.statusCode) { return true }
+        if (response.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased().contains("html") { return true }
+        let start = String(decoding: data.prefix(64), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        return start.hasPrefix("<")
+    }
+
+    func webPageError(_ response: HTTPURLResponse, _ data: Data) -> ProxmoxError {
+        let location = response.value(forHTTPHeaderField: "Location") ?? ""
+        let text = String(decoding: data, as: UTF8.self)
+        let access = location.range(of: "cloudflareaccess.com", options: .caseInsensitive) != nil
+            || location.range(of: "/cdn-cgi/access/", options: .caseInsensitive) != nil
+            || response.value(forHTTPHeaderField: "cf-access-domain") != nil
+            || response.value(forHTTPHeaderField: "CF-Access-Aud") != nil
+            || text.range(of: "cloudflareaccess", options: .caseInsensitive) != nil
+            || text.range(of: "Cloudflare Access", options: .caseInsensitive) != nil
+            || text.contains("AccessLogo")
+        if access { return .cloudflareAccess(host: host, tokenSent: extraHeaders["CF-Access-Client-Id"] != nil) }
+        return .webPage(host: host, status: response.statusCode)
+    }
+
+    /// Don't follow redirects: see `isWebPage`.
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(nil)
     }
 
     private static func errorMessage(_ response: HTTPURLResponse, _ data: Data) -> String {

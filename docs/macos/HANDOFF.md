@@ -4,7 +4,12 @@ Read `CLAUDE.md` first (working rules, EDG_Lab etiquette, dev aids). This file l
 gained since v1.0.0 that the macOS app still lacks, with the design already used on Windows so both stay
 in step. Answer the maintainer in Italian.
 
-Done on macOS (2026-11-23): sections 1–3, tested on EDG_Lab (tunnel: 4 WebSockets, console connected; update: dev bundle 0.9.0 → real v1.0.0, swapped, signature valid, relaunched). Left: section 4 (release).
+Done on macOS (2026-11-23): sections 1–3, tested on EDG_Lab (tunnel: 4 WebSockets, console connected; update: dev bundle 0.9.0 → real v1.0.0, swapped, signature valid, relaunched). Section 4: v1.0.1 released (both DMGs + sources, Latest).
+Done on macOS (2026-11-24): Cloudflare Access (service token in the profile + Keychain `<uuid>.access`, API
+headers, no redirects + login-page detection, WKWebView navigations with the headers, tunnel handshake headers
+when `spiceTunnelUsesAccess`, editor sections). Tested on EDG_Lab with a made-up token (`spicetunnel:103:access`:
+login OK, 4/4 tunnel handshakes with the headers, SPICE and noVNC connected) and offline (`accesscheck`). Not
+tested against a real Access application (the maintainer has none set up yet). Next: release v1.0.2.
 
 State at handoff: macOS `v1.0.0` released (both DMGs, sources). Windows `windows-v1.0.1` released with
 everything below. All work is on `main`.

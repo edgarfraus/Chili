@@ -211,7 +211,7 @@ Chili chiede a Proxmox di instradare la sessione attraverso l'host che hai inser
 solo indirizzo anche in un cluster. Da internet, metti entrambe le porte dietro una VPN (WireGuard,
 Tailscale…) invece di esporle.
 
-#### Tramite un Cloudflare Tunnel (app per Windows)
+#### Tramite un Cloudflare Tunnel
 
 Se Proxmox è pubblicato con `cloudflared` ed è raggiungibile solo la porta 8006 (in HTTPS), per SPICE
 serve anche lo spiceproxy. Cloudflare non può trasportarlo come pagina web, ma può farlo come servizio
@@ -234,7 +234,7 @@ TCP, che l'app per Windows raggiunge da sola via WebSocket (senza WARP né `clou
 
 Lo spiceproxy accetta comunque solo i ticket monouso che Proxmox rilascia agli utenti autenticati.
 
-**Dietro Cloudflare Access?** (per ora nell'app per Windows; macOS a seguire.) Chili non può compilare la pagina di login di Access nel browser. Crea un
+**Dietro Cloudflare Access?** Chili non può compilare la pagina di login di Access nel browser. Crea un
 service token (*Zero Trust → Access → Service credentials → Service Tokens*), aggiungi all'applicazione
 Access che protegge il nome host di Proxmox una policy con azione **Service Auth** che lo includa, e
 inserisci Client ID e Client Secret in **Cloudflare Access** nelle impostazioni del server. Chili li invia

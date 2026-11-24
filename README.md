@@ -230,7 +230,7 @@ reaches over WebSocket by itself, on macOS and Windows (no WARP or `cloudflared`
 
 The spiceproxy itself only accepts the one-time tickets Proxmox issues to logged-in users.
 
-**Behind Cloudflare Access?** (Windows app for now; macOS next.) Chili can't fill in Access' browser login page. Create a service token
+**Behind Cloudflare Access?** Chili can't fill in Access' browser login page. Create a service token
 (*Zero Trust → Access → Service credentials → Service Tokens*), add a policy with the action **Service Auth**
 that includes it to the Access application protecting the Proxmox hostname, and enter its Client ID and
 Client Secret under **Cloudflare Access** in the server settings. Chili sends them with every API request

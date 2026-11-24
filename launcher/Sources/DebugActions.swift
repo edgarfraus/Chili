@@ -238,12 +238,16 @@ enum DebugActions {
     /// spicetunnel:<vmid> — the Cloudflare Tunnel path without Cloudflare: an in-process WebSocket↔TCP
     /// bridge to the server's spiceproxy plays cloudflared, and a copy of the profile (in memory only)
     /// points spiceTunnelHost at it. Opens a running VM's console through it (never starts a VM).
-    static func spiceTunnel(app: AppModel, real: ServerSession, vmid: String) async {
+    /// spicetunnel:<vmid>:access — also with a made-up Cloudflare Access service token (in memory only;
+    /// Proxmox ignores the headers): checks that the API, the tunnel handshake and noVNC carry it.
+    static func spiceTunnel(app: AppModel, real: ServerSession, vmid: String, access: Bool = false) async {
         let bridge = WebSocketBridge(targetHost: real.api.host, targetPort: 3128)
         guard let port = try? await bridge.start() else { return log("spicetunnel: bridge failed to start") }
         var profile = real.profile
         profile.spiceTunnelHost = "ws://localhost:\(port)/"
-        let session = ServerSession(profile: profile, app: app)
+        if access { profile.accessClientId = "chili-debug.access" }
+        let session = ServerSession(profile: profile, app: app, accessSecret: access ? "chili-debug-secret" : nil)
+        log("spicetunnel: api headers=\(session.api.extraHeaders.keys.sorted())")
         session.login(secret: real.storedSecret ?? "")
         for _ in 0..<40 where session.state != .ready { try? await Task.sleep(nanoseconds: 500_000_000) }
         let vm = session.vms.first { String($0.vmid) == vmid }
@@ -253,11 +257,35 @@ enum DebugActions {
         }
         session.connect(vm)
         try? await Task.sleep(nanoseconds: 10_000_000_000)
-        log("spicetunnel: websockets bridged=\(bridge.count) client streams=\(session.tunnel?.bridgedCount ?? 0) " +
+        log("spicetunnel: websockets bridged=\(bridge.count) with access headers=\(bridge.withAccessHeaders) client streams=\(session.tunnel?.bridgedCount ?? 0) " +
             "tunnel error=\(session.tunnel?.lastError ?? "none") console=\(app.consoles.last.map { "\($0.state.rawValue)" } ?? "none")")
+        if access {
+            session.openWebConsole(.vm(vm))
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            log("spicetunnel: noVNC console=\(app.consoles.last.map { "\($0.state.rawValue) \($0.errorMessage ?? "")" } ?? "none")")
+        }
         keep += [session, bridge]   // leave the console usable
     }
     private static var keep: [AnyObject] = []
+
+    /// accesscheck — offline: how answers from a login page in front of Proxmox are classified.
+    static func accessCheck() {
+        let url = URL(string: "https://pve.example.com:8006/api2/json/version")!
+        func check(_ name: String, _ status: Int, _ headers: [String: String], _ body: String, token: Bool) {
+            let client = ProxmoxClient(host: "pve.example.com", port: 8006)
+            if token { client.extraHeaders = ["CF-Access-Client-Id": "x", "CF-Access-Client-Secret": "y"] }
+            let r = HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)!
+            let data = Data(body.utf8)
+            let web = ProxmoxClient.isWebPage(r, data)
+            log("accesscheck \(name): webPage=\(web)" + (web ? " → \(client.webPageError(r, data).localizedDescription)" : ""))
+        }
+        check("api json", 200, ["Content-Type": "application/json"], #"{"data":{"version":"9.0"}}"#, token: false)
+        check("api 401", 401, ["Content-Type": "application/json"], #"{"data":null}"#, token: false)
+        check("access redirect", 302, ["Location": "https://team.cloudflareaccess.com/cdn-cgi/access/login/pve.example.com"], "", token: false)
+        check("access 403 with token", 403, ["Content-Type": "text/html", "cf-access-domain": "pve.example.com"],
+              "<html><title>Forbidden</title>AccessLogo</html>", token: true)
+        check("other login page", 200, ["Content-Type": "text/html"], "<!DOCTYPE html><html>Authelia</html>", token: false)
+    }
 }
 
 /// Debug only: a WebSocket server that pipes each connection to a TCP target (what cloudflared does
@@ -267,6 +295,8 @@ final class WebSocketBridge {
     private let queue = DispatchQueue(label: "chili.debug.bridge")
     private var listener: NWListener?
     private(set) var count = 0
+    /// Handshakes that carried CF-Access-Client-Id and CF-Access-Client-Secret.
+    private(set) var withAccessHeaders = 0
 
     init(targetHost: String, targetPort: UInt16) {
         target = .hostPort(host: NWEndpoint.Host(targetHost), port: NWEndpoint.Port(rawValue: targetPort)!)
@@ -276,6 +306,11 @@ final class WebSocketBridge {
         let params = NWParameters.tcp
         let ws = NWProtocolWebSocket.Options()
         ws.autoReplyPing = true
+        ws.setClientRequestHandler(queue) { [weak self] _, headers in
+            let names = Set(headers.map { $0.name.lowercased() })
+            if names.isSuperset(of: ["cf-access-client-id", "cf-access-client-secret"]) { self?.withAccessHeaders += 1 }
+            return NWProtocolWebSocket.Response(status: .accept, subprotocol: nil)
+        }
         params.defaultProtocolStack.applicationProtocols.insert(ws, at: 0)
         let l = try NWListener(using: params)
         listener = l
