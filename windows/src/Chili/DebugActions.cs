@@ -153,11 +153,14 @@ public sealed partial class MainWindow
                 });
             }
         });
-        var session = new ServerSession(real.Profile with { SpiceTunnelHost = $"ws://localhost:{port}/" }, model);
+        // CHILI_DEBUG_TUNNEL_URL: an external WebSocket bridge (websockify, a Cloudflare Tunnel) instead.
+        var tunnelUrl = Environment.GetEnvironmentVariable("CHILI_DEBUG_TUNNEL_URL") is { Length: > 0 } external
+            ? external : $"ws://localhost:{port}/";
+        var session = new ServerSession(real.Profile with { SpiceTunnelHost = tunnelUrl }, model);
         session.Login(real.StoredSecret ?? "");
         for (int i = 0; i < 40 && session.State != ServerSession.SessionState.Ready; i++) await Task.Delay(500);
         var vm = session.VMs.FirstOrDefault(v => v.VmId == vmid);
-        Debug.Log($"spicetunnel: state={session.State} vm={vm?.DisplayName} running={vm?.IsRunning} local port={session.SpiceTunnel?.Port}");
+        Debug.Log($"spicetunnel: via {tunnelUrl} state={session.State} vm={vm?.DisplayName} running={vm?.IsRunning} local port={session.SpiceTunnel?.Port}");
         if (vm is not { IsRunning: true }) return;
         await Consoles.ConnectAsync(session, vm);
         await Task.Delay(8000);

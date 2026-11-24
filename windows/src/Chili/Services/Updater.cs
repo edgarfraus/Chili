@@ -43,20 +43,39 @@ public sealed class Updater
         ui.TryEnqueue(async () => { await Task.Delay(TimeSpan.FromSeconds(debug ? 1 : 15)); await CheckAsync(); });
     }
 
+    /// <summary>Scheduled check: only when automatic checks are on.</summary>
     public async Task CheckAsync()
     {
         if (!enabled()) return;
+        await CheckNowAsync();
+    }
+
+    /// <summary>When the last check finished, and what it found (null: up to date).</summary>
+    public DateTime? LastChecked { get; private set; }
+    public string? LastError { get; private set; }
+
+    /// <summary>Checks right away (also from the Info page, whatever the preference). Raises
+    /// <see cref="Available"/> for a release not announced yet.</summary>
+    public async Task<ReleaseInfo?> CheckNowAsync()
+    {
         try
         {
             var release = await Updates.CheckAsync(http, Current, Arch);
             Debug.Log($"update check: current {Current}, latest {release?.Tag ?? "none newer"}");
-            if (release is null || release.Version == Pending?.Version) return;
-            Pending = release;
-            Available?.Invoke(release);
+            LastChecked = DateTime.Now;
+            LastError = null;
+            if (release is not null && release.Version != Pending?.Version)
+            {
+                Pending = release;
+                Available?.Invoke(release);
+            }
+            return release;
         }
         catch (Exception e)
         {
             Debug.Log($"update check failed: {e.Message}");   // offline, rate-limited…: try again later
+            LastError = e.Message;
+            return null;
         }
     }
 

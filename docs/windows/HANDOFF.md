@@ -46,3 +46,23 @@ Everything is on `main`; pull it first.
    a Cloudflare Tunnel still accepts it (the in-process bridge doesn't care either way). Report what you
    find in this file.
 5. Commit with `[skip ci]` unless a CI run is wanted; push to `main`.
+
+## Results on the Windows machine (2026-11-24)
+
+- **Build and tests:** both fine. One test (`CloudflareAccessTests.OtherWebPagesAreReportedAsSuch`) was
+  flaky: it checks English text while the translation test switches `L` to Italian in parallel. Fixed by
+  putting it in the `Localization` collection; 6 runs in a row green. CI on `main` (Build (Windows)) green.
+- **Server editor:** checked in Italian and English with both sections open: the new captions wrap, the
+  dialog keeps its width, nothing is cut off.
+- **Tunnel regression:** `spicetunnel:102` (W2025, already running; no input sent): 4 WebSockets bridged,
+  no tunnel error, console connected.
+- **websockify:** not tried yet — it needs Python and `pip install websockify` on the maintainer's PC,
+  which waits for their OK. `DebugSpiceTunnelAsync` now honours `CHILI_DEBUG_TUNNEL_URL` (e.g.
+  `ws://localhost:6080/`) to use an external bridge instead of the in-process one.
+- **New: Info page** (sidebar footer, `Views/InfoView.cs`): version and architecture, updates (status,
+  *Check for Updates* — works even with automatic checks off —, the automatic-check preference, *Update Now*
+  when a newer release is known), links (project, this version's release notes, releases, issues, source),
+  bundled components and versions (from `viewer\PACKAGES.txt`, plus .NET and WebView2), buttons that open
+  the settings, logs and program folders. `Updater.CheckNowAsync()` returns the result and records
+  `LastChecked` / `LastError`; no updater in demo mode. Debug action `info`. Italian strings in
+  `it.windows.strings` (*Info page*); move them to `it.lproj` when macOS gets the same page.

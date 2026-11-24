@@ -33,6 +33,7 @@ public sealed partial class MainWindow : Window
             p.PreferredMinimumHeight = 480;
         }
         AddServerItem.Content = L.T("Add Server…");
+        InfoItem.Content = L.T("Info");
         model.ShowAlert = ShowAlertAsync;
         model.ServersChanged += () => BuildMenu(Nav.SelectedItem is NavigationViewItem { Tag: string t } ? t : null);
         BuildMenu(model.Settings.Servers.FirstOrDefault() is { } first ? ServerTag(first) : QuickTag);
@@ -85,7 +86,8 @@ public sealed partial class MainWindow : Window
             item.ContextFlyout = menu;
             Nav.MenuItems.Add(item);
         }
-        var target = Nav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => (string)i.Tag == select)
+        var target = (select == InfoTag ? InfoItem : null)
+                     ?? Nav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => (string)i.Tag == select)
                      ?? Nav.MenuItems.OfType<NavigationViewItem>().First();
         Nav.SelectedItem = target;
         ShowDetail((string)target.Tag);
@@ -105,6 +107,10 @@ public sealed partial class MainWindow : Window
         if (tag == QuickTag)
         {
             Detail.Content = new QuickConnectView(model, this);
+        }
+        else if (tag == InfoTag)
+        {
+            Detail.Content = new InfoView(this);
         }
         else if (tag.StartsWith("server:") && Guid.TryParse(tag[7..], out var id)
                  && model.Settings.Servers.FirstOrDefault(s => s.Id == id) is { } profile)
@@ -190,16 +196,27 @@ public sealed partial class MainWindow : Window
     // MARK: Updates
 
     private Updater? updater;
+    private const string InfoTag = "info";
+
+    /// <summary>Null in demo mode (no network).</summary>
+    public Updater? Updater => updater;
+    /// <summary>A newer release was found (the Info page listens too).</summary>
+    public event Action<Core.ReleaseInfo>? UpdateAvailable;
 
     private void StartUpdater()
     {
+        if (Demo.IsOn) return;
         updater = new Updater(() => model.Settings.Preferences.CheckForUpdates);
         updater.Available += ShowUpdate;
         updater.Start(DispatcherQueue);
     }
 
+    /// <summary>Update Now from the Info page: same as the banner's button.</summary>
+    public void StartUpdate() => OnUpdateNow(this, new RoutedEventArgs());
+
     private void ShowUpdate(Core.ReleaseInfo release)
     {
+        UpdateAvailable?.Invoke(release);
         UpdateBar.Title = L.F("Chili %@ is available", release.Version.ToString(3));
         UpdateBar.Message = L.F("You have version %@.", Updater.Current.ToString(3));
         UpdateBar.Severity = InfoBarSeverity.Informational;
@@ -361,6 +378,9 @@ public sealed partial class MainWindow : Window
                 break;
             case "edit":
                 if (model.Settings.Servers.FirstOrDefault() is { } p) await EditServerAsync(p);
+                break;
+            case "info":
+                Nav.SelectedItem = InfoItem;
                 break;
             case "quick":
                 Nav.SelectedItem = Nav.MenuItems[0];

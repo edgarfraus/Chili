@@ -114,6 +114,18 @@ Bump `VERSION` to `1.0.1`, commit, tag `v1.0.1`, push, then start the build by h
 pushes too. `build.yml` already ignores `windows/**` changes. Verify both DMGs and the sources tar on the
 release, and that the macOS release stays "Latest".
 
+## 4b. Info page (added on Windows, 2026-11-24)
+
+Windows now has an **Info** item at the bottom of the sidebar (`windows/src/Chili/Views/InfoView.cs`): version
+and architecture; updates (status line, *Check for Updates* that works even with automatic checks off, the
+*Check for updates automatically* preference, *Update Now* when a newer release is known); links (project page,
+this version's release notes `releases/tag/v<version>`, all releases, issues, source); bundled components with
+their versions (spice-gtk, virt-viewer, GStreamer, GTK, OpenSSL, plus the platform runtime); buttons that open
+the settings and logs folders. On macOS the natural place is the standard *About Chili* window (app menu) or a
+sidebar item like on Windows — the maintainer asked for "una tab con le info", so mirror the sidebar item and
+keep the app menu entry pointing to it. Italian strings: `windows/src/Chili.Core/Strings/it.windows.strings`,
+section *Info page* — move them to `it.lproj` and drop them from the Windows file.
+
 ## 5. Also useful to know
 
 - Windows-only things that macOS already has natively: single instance, `.vv`/`spice://` handling, noVNC and

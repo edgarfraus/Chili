@@ -22,6 +22,11 @@
                     <SymbolIcon Symbol="Add" />
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
+            <NavigationViewItem x:Name="InfoItem" Tag="info">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE946;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
         </NavigationView.FooterMenuItems>
         <Grid>
             <Grid.RowDefinitions>

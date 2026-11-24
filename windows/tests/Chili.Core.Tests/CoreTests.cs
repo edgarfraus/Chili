@@ -392,6 +392,7 @@ public class UpdateTests
         Assert.Equal("abc123", Updates.ParseSha256("abc123  Chili-1.0.1-x64-setup.exe"));
 }
 
+[Collection("Localization")]   // checks English message text: not while another test switches L to Italian
 public class CloudflareAccessTests
 {
     /// <summary>A local stand-in for a hostname behind Cloudflare Access.</summary>
