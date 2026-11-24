@@ -19,14 +19,16 @@ by GitHub Actions.
 - New VM (recommended preset or every option) and new container wizards; history & logs per VM;
   system log per node.
 - **SPICE through a Cloudflare Tunnel** without WARP or cloudflared on the PC: publish the spiceproxy
-  (`tcp://localhost:3128`) on its own hostname and enter it under *SPICE tunnel* in the server settings
-  (see the README, *Network requirements*).
-- **Cloudflare Access** supported with a service token (Client ID + Secret in *Remote access (Cloudflare)*);
-  an Access login page is now reported as such instead of showing its HTML.
+  (`tcp://localhost:3128`) on its own hostname and enter it under *SPICE tunnel (Cloudflare)* in the server
+  settings (see the README, *Network requirements*).
+- **Cloudflare Access** supported with a service token (*Cloudflare Access* section of the server settings),
+  independent of the SPICE tunnel (a checkbox sends it to the tunnel too); an Access login page is reported
+  as such instead of showing its HTML.
+- **noVNC, container consoles and node shells inside the app**, in console tabs (WebView2), already logged in.
+- **Automatic updates** from these GitHub releases.
 - English and Italian.
 
-Not yet on Windows: noVNC, container consoles and the node shell open in your browser (Proxmox asks you to
-log in there); the Windows key and Alt+Tab go to Windows, not to the VM; there's no settings page yet.
+Not yet on Windows: the Windows key and Alt+Tab go to Windows, not to the VM; there's no settings page yet.
 
 `*-windows-sources.tar` contains Chili's source and the MSYS2 source packages of every bundled component
 (remote-viewer, spice-gtk, GTK, GStreamer…), as required by the GPL.

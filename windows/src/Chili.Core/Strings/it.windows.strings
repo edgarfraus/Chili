@@ -17,10 +17,18 @@
 "Loading…" = "Caricamento…";
 
 /* Cloudflare Access */
-"Remote access (Cloudflare)" = "Accesso remoto (Cloudflare)";
-"Access Client ID" = "Client ID di Access";
-"Access Client Secret" = "Client Secret di Access";
-"Only if Cloudflare Access protects the server: a service token (Zero Trust → Access → Service credentials) allowed by a Service Auth policy. Sent with every request and to the SPICE tunnel." = "Solo se Cloudflare Access protegge il server: un service token (Zero Trust → Access → Service credentials) autorizzato da una policy Service Auth. Viene inviato con ogni richiesta e al tunnel SPICE.";
-"%@ is protected by Cloudflare Access, which Chili can't log in to with a browser page. Create a service token in Cloudflare Zero Trust, allow it with a Service Auth policy, and enter it in the server settings, under Remote access (Cloudflare)." = "%@ è protetto da Cloudflare Access, a cui Chili non può accedere con una pagina di login del browser. Crea un service token in Cloudflare Zero Trust, autorizzalo con una policy Service Auth e inseriscilo nelle impostazioni del server, in Accesso remoto (Cloudflare).";
+"%@ is protected by Cloudflare Access, which Chili can't log in to with a browser page. Create a service token in Cloudflare Zero Trust, allow it with a Service Auth policy, and enter it in the server settings, under Cloudflare Access." = "%@ è protetto da Cloudflare Access, a cui Chili non può accedere con una pagina di login del browser. Crea un service token in Cloudflare Zero Trust, autorizzalo con una policy Service Auth e inseriscilo nelle impostazioni del server, in Cloudflare Access.";
 "Cloudflare Access refused the service token for %@. Check the Client ID and Secret, and that the Access application has a Service Auth policy that includes this token." = "Cloudflare Access ha rifiutato il service token per %@. Controlla Client ID e Secret, e che l'applicazione Access abbia una policy Service Auth che includa questo token.";
 "%@ answered with a web page instead of the Proxmox API (HTTP %d). Is there a login page or a proxy in front of it?" = "%@ ha risposto con una pagina web invece che con le API di Proxmox (HTTP %d). C'è una pagina di login o un proxy davanti?";
+"Cloudflare Access" = "Cloudflare Access";
+"Client ID" = "Client ID";
+"Client Secret" = "Client Secret";
+"Only if Cloudflare Access protects the Proxmox hostname: a service token (Zero Trust → Access → Service credentials) allowed by a Service Auth policy. Used for the API and the web consoles, and for the SPICE tunnel if ticked there." = "Solo se Cloudflare Access protegge il nome host di Proxmox: un service token (Zero Trust → Access → Service credentials) autorizzato da una policy Service Auth. Usato per le API e le console web, e per il tunnel SPICE se lo spunti lì.";
+"SPICE tunnel (Cloudflare)" = "Tunnel SPICE (Cloudflare)";
+"Use the Cloudflare Access token for the tunnel too" = "Usa il token di Cloudflare Access anche per il tunnel";
+
+/* Web consoles */
+"Reload" = "Ricarica";
+"Open in Browser" = "Apri nel browser";
+"The console could not be opened" = "Impossibile aprire la console";
+"The page could not be loaded (%@)." = "Impossibile caricare la pagina (%@).";

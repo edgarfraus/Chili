@@ -27,6 +27,7 @@ public sealed class ServerEditorDialog : ContentDialog
     private readonly TextBox tunnel = new() { PlaceholderText = "spice.example.com" };
     private readonly TextBox accessId = new() { PlaceholderText = "0123abcd….access" };
     private readonly PasswordBox accessSecret = new();
+    private readonly CheckBox tunnelUsesAccess = new() { Content = L.T("Use the Cloudflare Access token for the tunnel too") };
     private readonly TextBlock tunnelHint = new()
     {
         Text = L.T("Only if Proxmox is reachable through a Cloudflare Tunnel: the hostname of the tunnel's TCP service for spiceproxy (service: tcp://localhost:3128). Leave empty otherwise."),
@@ -47,13 +48,13 @@ public sealed class ServerEditorDialog : ContentDialog
     public string? Secret => secret.Password.Length > 0 ? secret.Password : null;
     public string? AccessSecret => accessSecret.Password.Length > 0 ? accessSecret.Password : null;
     public bool Removed { get; private set; }
-    private readonly Expander expander;
+    private readonly Expander expander, accessExpander;
 
-    /// <summary>Debug actions: show the remote-access section.</summary>
-    /// <summary>Debug actions: open the remote-access section and scroll to the end.</summary>
+
+    /// <summary>Debug actions: open the Cloudflare sections and scroll to the end.</summary>
     public void ExpandRemoteAccess()
     {
-        expander.IsExpanded = true;
+        foreach (var e in new[] { expander, accessExpander }) e.IsExpanded = true;
         Opened += async (_, _) =>
         {
             await Task.Delay(400);
@@ -96,6 +97,7 @@ public sealed class ServerEditorDialog : ContentDialog
         tunnel.Text = original.SpiceTunnelHost;
         accessId.Text = original.AccessClientId;
         if (original.AccessClientId.Length > 0) accessSecret.PlaceholderText = L.T("unchanged");
+        tunnelUsesAccess.IsChecked = original.SpiceTunnelUsesAccess;
         if (!isNew) secret.PlaceholderText = L.T("unchanged");
 
         var grid = new Grid { ColumnSpacing = 12, RowSpacing = 10 };
@@ -125,38 +127,48 @@ public sealed class ServerEditorDialog : ContentDialog
         tokenRows = [.. tokenRow, .. hintRow];
         secretLabel = (TextBlock)secretRow[0];
 
-        // Remote access through Cloudflare: SPICE tunnel and Access service token. Collapsed
-        // unless something is configured, to keep the dialog short.
-        var remote = new Grid { ColumnSpacing = 12, RowSpacing = 10 };
-        remote.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
-        remote.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        int r = 0;
-        void RemoteRow(string? label, FrameworkElement control)
+        // Two independent Cloudflare sections, collapsed unless configured: Access in front of the
+        // Proxmox hostname, and the SPICE tunnel (with its own, optional Access token).
+        static (Expander Expander, Action<string?, FrameworkElement> Row) Section(string title, bool open)
         {
-            remote.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var text = new TextBlock
+            var g = new Grid { ColumnSpacing = 12, RowSpacing = 10 };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            int n = 0;
+            void Add(string? label, FrameworkElement control)
             {
-                Text = label ?? "", VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right,
-                TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right,
+                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var text = new TextBlock
+                {
+                    Text = label ?? "", VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right,
+                    TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right,
+                };
+                Grid.SetRow(text, n); Grid.SetRow(control, n); Grid.SetColumn(control, 1);
+                g.Children.Add(text); g.Children.Add(control);
+                n++;
+            }
+            var e = new Expander
+            {
+                Header = title, Content = g, IsExpanded = open,
+                HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
             };
-            Grid.SetRow(text, r); Grid.SetRow(control, r); Grid.SetColumn(control, 1);
-            remote.Children.Add(text); remote.Children.Add(control);
-            r++;
+            return (e, Add);
         }
-        RemoteRow(L.T("SPICE tunnel"), tunnel);
-        RemoteRow(null, tunnelHint);
-        RemoteRow(L.T("Access Client ID"), accessId);
-        RemoteRow(L.T("Access Client Secret"), accessSecret);
-        RemoteRow(null, Form.Caption(L.T("Only if Cloudflare Access protects the server: a service token (Zero Trust → Access → Service credentials) allowed by a Service Auth policy. Sent with every request and to the SPICE tunnel.")));
-        expander = new Expander
-        {
-            Header = L.T("Remote access (Cloudflare)"), Content = remote,
-            HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            IsExpanded = original.SpiceTunnelHost.Length > 0 || original.AccessClientId.Length > 0,
-        };
-        var page = new StackPanel { Spacing = 14, Width = 440 };
+        var (accessSection, accessRow) = Section(L.T("Cloudflare Access"), original.AccessClientId.Length > 0);
+        accessRow(L.T("Client ID"), accessId);
+        accessRow(L.T("Client Secret"), accessSecret);
+        accessRow(null, Form.Caption(L.T("Only if Cloudflare Access protects the Proxmox hostname: a service token (Zero Trust → Access → Service credentials) allowed by a Service Auth policy. Used for the API and the web consoles, and for the SPICE tunnel if ticked there.")));
+        var (tunnelSection, tunnelRow) = Section(L.T("SPICE tunnel (Cloudflare)"), original.SpiceTunnelHost.Length > 0);
+        tunnelRow(L.T("Hostname"), tunnel);
+        tunnelRow(null, tunnelHint);
+        tunnelRow(null, tunnelUsesAccess);
+        expander = tunnelSection;
+        accessExpander = accessSection;
+        var page = new StackPanel { Spacing = 10, Width = 440 };
         page.Children.Add(grid);
-        page.Children.Add(expander);
+        page.Children.Add(new Border { Height = 4 });
+        page.Children.Add(accessSection);
+        page.Children.Add(tunnelSection);
         // Our own scroller: ContentDialog doesn't re-measure when the expander grows after it opened,
         // which left the Access fields below the bottom edge, unreachable.
         scroller = new ScrollViewer
@@ -166,8 +178,9 @@ public sealed class ServerEditorDialog : ContentDialog
         };
         Content = scroller;
         Opened += (_, _) => { FitToWindow(); XamlRoot.Changed += (_, _) => FitToWindow(); };
-        expander.Expanding += (_, _) => DispatcherQueue.TryEnqueue(() =>
-            scroller.ChangeView(null, scroller.ScrollableHeight, null));
+        foreach (var section in new[] { accessSection, tunnelSection })
+            section.Expanding += (_, _) => DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => section.StartBringIntoView());
 
         FillRealms();
         method.SelectionChanged += (_, _) => UpdateMode();
@@ -251,6 +264,7 @@ public sealed class ServerEditorDialog : ContentDialog
             RememberSecret = remember.IsChecked == true,
             SpiceTunnelHost = tunnel.Text.Trim(),
             AccessClientId = accessId.Text.Trim(),
+            SpiceTunnelUsesAccess = tunnelUsesAccess.IsChecked == true,
         };
     }
 }

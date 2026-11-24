@@ -98,8 +98,8 @@ amministratore, aggiunge Chili al menu Start e apre i file `.vv` e i link `spice
 ancora firmato: se Windows dice *"PC protetto da Windows"*, fai clic su **Ulteriori informazioni →
 Esegui comunque**. Requisiti: Windows 10 (1809) o successivo, 64 bit.
 
-L'app per Windows ha le funzioni Proxmox descritte qui sotto e una console SPICE integrata; noVNC, le
-console dei container e la shell del nodo si aprono ancora nel browser. Il sorgente è in [`windows/`](windows).
+L'app per Windows ha le funzioni Proxmox descritte qui sotto, una console SPICE integrata, e noVNC, le
+console dei container e la shell del nodo in schede dentro l'app (WebView2). Il sorgente è in [`windows/`](windows).
 
 ## Primo avvio
 
@@ -230,15 +230,17 @@ TCP, che l'app per Windows raggiunge da sola via WebSocket (senza WARP né `clou
      - service: http_status:404
    ```
    (e `cloudflared tunnel route dns <tunnel> spice.example.com`).
-2. In Chili, modifica il server e inserisci `spice.example.com` in **Tunnel SPICE**.
+2. In Chili, modifica il server e inserisci `spice.example.com` in **Tunnel SPICE (Cloudflare) → Hostname**.
 
 Lo spiceproxy accetta comunque solo i ticket monouso che Proxmox rilascia agli utenti autenticati.
 
 **Dietro Cloudflare Access?** (per ora nell'app per Windows; macOS a seguire.) Chili non può compilare la pagina di login di Access nel browser. Crea un
-service token (*Zero Trust → Access → Service credentials → Service Tokens*), aggiungi alle applicazioni
-Access che proteggono i nomi host di Proxmox e di SPICE una policy con azione **Service Auth** che lo
-includa, e inserisci Client ID e Client Secret in **Accesso remoto (Cloudflare)** nelle impostazioni del
-server. Chili li invia con ogni richiesta e al tunnel SPICE.
+service token (*Zero Trust → Access → Service credentials → Service Tokens*), aggiungi all'applicazione
+Access che protegge il nome host di Proxmox una policy con azione **Service Auth** che lo includa, e
+inserisci Client ID e Client Secret in **Cloudflare Access** nelle impostazioni del server. Chili li invia
+con ogni richiesta alle API e dalle sue console web. Access e il tunnel SPICE sono indipendenti: se anche
+il nome host SPICE è dietro Access (con lo stesso token autorizzato), spunta *Usa il token di Cloudflare
+Access anche per il tunnel*.
 
 ### Aprire le console dall'interfaccia web di Proxmox
 

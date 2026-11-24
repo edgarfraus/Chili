@@ -15,7 +15,7 @@ public sealed class AppModel
     public Func<string, string, Task>? ShowAlert { get; set; }
 
     /// <summary>Open built-in consoles, in sidebar order.</summary>
-    public List<ConsoleSession> Consoles { get; } = [];
+    public List<IConsole> Consoles { get; } = [];
 
     public ServerSession Session(ServerProfile profile)
     {

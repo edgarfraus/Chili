@@ -113,7 +113,19 @@ public sealed partial class MainWindow : Window
         }
         else if (tag.StartsWith("console:") && model.Consoles.FirstOrDefault(c => ConsoleTag(c) == tag) is { } console)
         {
-            Detail.Content = new ConsoleView(console, this);
+            // Console views are kept while the console is open: a web console would otherwise
+            // reload (and reconnect) every time it is selected again.
+            if (!consoleViews.TryGetValue(console.Id, out var view))
+            {
+                view = console switch
+                {
+                    ConsoleSession spice => new ConsoleView(spice, this),
+                    WebConsoleSession webConsole => new WebConsoleView(webConsole, this),
+                    _ => throw new InvalidOperationException(),
+                };
+                consoleViews[console.Id] = view;
+            }
+            Detail.Content = view;
         }
         else
         {
@@ -124,7 +136,18 @@ public sealed partial class MainWindow : Window
     // MARK: Consoles
 
     private readonly Dictionary<Guid, FontIcon> consoleIcons = [];
-    private static string ConsoleTag(ConsoleSession c) => $"console:{c.Id}";
+    private readonly Dictionary<Guid, UserControl> consoleViews = [];
+    private static string ConsoleTag(IConsole c) => $"console:{c.Id}";
+
+    /// <summary>Opens Proxmox' noVNC / xterm.js console in a sidebar tab (WebView2).</summary>
+    public void OpenWebConsole(ServerSession server, Core.Proxmox.WebConsoleKind kind, string title)
+    {
+        var session = new WebConsoleSession(server, kind, title);
+        session.Changed += () => UpdateConsoleIcon(session);
+        model.Consoles.Add(session);
+        BuildMenu(ConsoleTag(session));
+        Activate();
+    }
 
     /// <summary>Opens a built-in SPICE console in the main window and connects it.</summary>
     public void OpenConsole(Core.ViewerConfig config, string title, Func<Task<Core.ViewerConfig>>? freshConfig,
@@ -138,10 +161,11 @@ public sealed partial class MainWindow : Window
         Activate();
     }
 
-    public void CloseConsole(ConsoleSession session)
+    public void CloseConsole(IConsole session)
     {
         if (IsFullScreen) ToggleFullScreen();
         model.Consoles.Remove(session);
+        consoleViews.Remove(session.Id);
         // Move the selection away before dropping the console (an empty detail pane otherwise).
         string? next = shownTag == ConsoleTag(session)
             ? model.Consoles.LastOrDefault() is { } other ? ConsoleTag(other) : QuickTag
@@ -151,13 +175,13 @@ public sealed partial class MainWindow : Window
         session.Close();
     }
 
-    private void UpdateConsoleIcon(ConsoleSession session)
+    private void UpdateConsoleIcon(IConsole session)
     {
         if (!consoleIcons.TryGetValue(session.Id, out var icon)) return;
-        var key = session.Connection.State switch
+        var key = session.State switch
         {
-            Spice.SpiceConnection.ConnectionState.Connected => "RunningBrush",
-            Spice.SpiceConnection.ConnectionState.Connecting => "WarningBrush",
+            ConsoleState.Connected => "RunningBrush",
+            ConsoleState.Connecting => "WarningBrush",
             _ => "TextFillColorSecondaryBrush",
         };
         icon.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[key];
@@ -364,7 +388,7 @@ public sealed partial class MainWindow : Window
                         await Task.Delay(s * 1000);
                         if (model.Consoles.LastOrDefault() is { } open)
                         {
-                            Debug.Log($"spice: closing ({open.Connection.State})");
+                            Debug.Log($"spice: closing ({open.State})");
                             CloseConsole(open);
                         }
                         if (round == 0 && target is { IsRunning: true })
@@ -403,6 +427,12 @@ public sealed partial class MainWindow : Window
                 break;
             case var t when t.StartsWith("spicetunnel:") && int.TryParse(t[12..], out var tid):
                 await DebugSpiceTunnelAsync(tid);
+                break;
+            case var n when n.StartsWith("novnc:") && int.TryParse(n[6..], out var nid):
+                await DebugWebConsoleAsync(nid);
+                break;
+            case "shell":
+                await DebugWebConsoleAsync(null);
                 break;
             case "cleanup":
                 await DebugCleanupAsync();

@@ -79,11 +79,33 @@ public sealed class Consoles(AppModel model, MainWindow window)
         catch (Exception e) { await model.PresentAsync(e); }
     }
 
-    /// <summary>noVNC for VMs, xterm.js for containers and node shells, served by Proxmox.
-    /// For now in the default browser; an embedded WebView2 tab comes next.</summary>
+    /// <summary>noVNC for VMs, xterm.js for containers and node shells, served by Proxmox, in a
+    /// console tab (WebView2). Without the WebView2 runtime, in the default browser.</summary>
     public async Task OpenWebConsoleAsync(ServerSession session, WebConsoleKind kind)
     {
-        try { await Launcher.LaunchUriAsync(session.Api.WebConsoleUri(kind)); }
+        try
+        {
+            if (!session.Api.UsesTicket)
+                throw new ProxmoxException(L.T("The noVNC and shell consoles need a password login: Proxmox' web pages can't use API tokens."));
+            var title = kind switch
+            {
+                WebConsoleKind.Vm { Machine: var vm } => $"{vm.DisplayName} ({vm.VmId})",
+                WebConsoleKind.NodeShell { Node: var node } => L.F("Shell – %@", node),
+                _ => "",
+            };
+            if (HasWebView2Runtime) window.OpenWebConsole(session, kind, title);
+            else await Launcher.LaunchUriAsync(session.Api.WebConsoleUri(kind));
+        }
         catch (Exception e) { await model.PresentAsync(e); }
+    }
+
+    /// <summary>Microsoft Edge WebView2 Runtime (part of Windows 11; usually present on Windows 10).</summary>
+    private static bool HasWebView2Runtime
+    {
+        get
+        {
+            try { return Microsoft.Web.WebView2.Core.CoreWebView2Environment.GetAvailableBrowserVersionString() is { Length: > 0 }; }
+            catch { return false; }
+        }
     }
 }

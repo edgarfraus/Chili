@@ -7,11 +7,17 @@ namespace Chili.ViewModels;
 /// <summary>An open console in the sidebar: a built-in SPICE display. Reconnecting asks for a
 /// fresh ticket when the console came from Proxmox (tickets are single-use and expire after
 /// ~30 s); plain SPICE connections reuse their settings.</summary>
-public sealed class ConsoleSession
+public sealed class ConsoleSession : IConsole
 {
     public Guid Id { get; } = Guid.NewGuid();
     public string Title { get; }
     public SpiceConnection Connection { get; private set; }
+    public ConsoleState State => Connection.State switch
+    {
+        SpiceConnection.ConnectionState.Connected => ConsoleState.Connected,
+        SpiceConnection.ConnectionState.Connecting => ConsoleState.Connecting,
+        _ => ConsoleState.Disconnected,
+    };
     /// <summary>Extra detail for a failed connection (e.g. why the Cloudflare Tunnel didn't open).</summary>
     public Func<string?>? Diagnostics { get; init; }
     private ViewerConfig config;

@@ -40,13 +40,22 @@ Windows reference: `windows/src/Chili.Core/Proxmox/TcpOverWebSocket.cs` (≈130 
   classic remote-viewer (it reads the proxy from the `.vv`).
 - `ServerEditor`: a "SPICE tunnel" text field (prompt `spice.example.com`) with the caption below.
 - Console disconnected overlay: append `"Cloudflare Tunnel (%@): %@"` with the tunnel error when there is one.
-- **Cloudflare Access** (added on Windows after this handoff was first written): optional service token
-  per server (`accessClientId` in the profile, secret in the Keychain), sent as `CF-Access-Client-Id` /
-  `CF-Access-Client-Secret` on every API request and on the tunnel WebSocket. Don't follow redirects;
-  a 3xx or an HTML answer means a login page: if it looks like Access (redirect to `*.cloudflareaccess.com`
-  or `/cdn-cgi/access/`, `cf-access-*` headers, "AccessLogo" in the page) show the service-token message,
-  otherwise "answered with a web page instead of the Proxmox API". Windows: `ProxmoxClient.IsWebPage`,
-  `CloudflareAccessException`, `CloudflareAccessTests`; editor section "Remote access (Cloudflare)".
+- **Cloudflare Access** (added on Windows after this handoff was first written; still missing on macOS):
+  optional service token per server (`accessClientId` in the profile, secret in the Keychain), sent as
+  `CF-Access-Client-Id` / `CF-Access-Client-Secret` on every API request **and by the web consoles**
+  (WKWebView: add the headers to the requests for the Proxmox host; Access then sets its `CF_Authorization`
+  cookie, which the noVNC/xterm.js WebSocket carries). **Independent of the SPICE tunnel**, as the
+  maintainer asked: the tunnel WebSocket gets the token only if `spiceTunnelUsesAccess` (default true; a
+  checkbox "Use the Cloudflare Access token for the tunnel too" in the tunnel section). Server editor, as on
+  Windows: two collapsible sections, **Cloudflare Access** (Client ID, Client Secret, caption) and
+  **SPICE tunnel (Cloudflare)** (Hostname, caption, that checkbox); each open only when configured.
+  Don't follow redirects; a 3xx or an HTML answer means a login page: if it looks like Access (redirect to
+  `*.cloudflareaccess.com` or `/cdn-cgi/access/`, `cf-access-*` headers, "AccessLogo" in the page) show the
+  service-token message, otherwise "answered with a web page instead of the Proxmox API". Windows:
+  `ProxmoxClient.IsWebPage`, `CloudflareAccessException`, `CloudflareAccessTests`,
+  `ServerSession.AccessHeaders`, `Views/ServerEditorDialog.cs`, `Views/WebConsoleView.cs`. Italian strings:
+  `windows/src/Chili.Core/Strings/it.windows.strings` (sections *Cloudflare Access*, *Web consoles*) — move
+  them to `it.lproj` like the others.
 - README already documents the server side (section *Network requirements → Through a Cloudflare Tunnel*):
   change its heading from "(Windows app)" to cover both apps.
 

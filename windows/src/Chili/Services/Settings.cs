@@ -22,9 +22,12 @@ public sealed record ServerProfile
     /// <summary>Hostname of a Cloudflare Tunnel TCP service for spiceproxy (port 3128), when the
     /// server is only reachable through the tunnel. Empty: SPICE goes to Host:3128 directly.</summary>
     public string SpiceTunnelHost { get; init; } = "";
-    /// <summary>Client ID of a Cloudflare Access service token, when the server sits behind Access
-    /// (the secret is in Credential Manager, purpose "access").</summary>
+    /// <summary>Client ID of a Cloudflare Access service token for the Proxmox hostname (API and web
+    /// consoles); the secret is in Credential Manager, purpose "access".</summary>
     public string AccessClientId { get; init; } = "";
+    /// <summary>Send the Access service token above to the SPICE tunnel hostname too (when it is behind
+    /// Access as well). The tunnel and Access otherwise work independently of each other.</summary>
+    public bool SpiceTunnelUsesAccess { get; init; } = true;
 
     [JsonIgnore] public string Title => Name.Length == 0 ? Host : Name;
     [JsonIgnore] public string FullUsername => Username.Contains('@') ? Username : $"{Username}@{Realm}";

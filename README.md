@@ -95,8 +95,8 @@ rights, adds Chili to the Start menu and opens `.vv` files and `spice://` links.
 code-signed yet: if Windows says *"Windows protected your PC"*, click **More info → Run anyway**.
 Requirements: Windows 10 (1809) or later, 64-bit.
 
-The Windows app has the Proxmox features described below and a built-in SPICE console; noVNC, container
-consoles and the node shell still open in the browser. Its source is in [`windows/`](windows).
+The Windows app has the Proxmox features described below, a built-in SPICE console, and noVNC, container
+consoles and node shells in tabs inside the app (WebView2). Its source is in [`windows/`](windows).
 
 ## First launch
 
@@ -226,15 +226,16 @@ reaches over WebSocket by itself, on macOS and Windows (no WARP or `cloudflared`
      - service: http_status:404
    ```
    (and `cloudflared tunnel route dns <tunnel> spice.example.com`).
-2. In Chili, edit the server and enter `spice.example.com` under **SPICE tunnel**.
+2. In Chili, edit the server and enter `spice.example.com` under **SPICE tunnel (Cloudflare) → Hostname**.
 
 The spiceproxy itself only accepts the one-time tickets Proxmox issues to logged-in users.
 
 **Behind Cloudflare Access?** (Windows app for now; macOS next.) Chili can't fill in Access' browser login page. Create a service token
 (*Zero Trust → Access → Service credentials → Service Tokens*), add a policy with the action **Service Auth**
-that includes it to the Access application(s) protecting the Proxmox and SPICE hostnames, and enter its
-Client ID and Client Secret under **Remote access (Cloudflare)** in the server settings. Chili sends them
-with every request and to the SPICE tunnel.
+that includes it to the Access application protecting the Proxmox hostname, and enter its Client ID and
+Client Secret under **Cloudflare Access** in the server settings. Chili sends them with every API request
+and from its web consoles. Access and the SPICE tunnel are independent: if the SPICE hostname is behind
+Access too (with the same token allowed), tick *Use the Cloudflare Access token for the tunnel too*.
 
 ### Opening consoles from the Proxmox web UI
 

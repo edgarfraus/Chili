@@ -162,7 +162,40 @@ public sealed partial class MainWindow
         await Consoles.ConnectAsync(session, vm);
         await Task.Delay(8000);
         Debug.Log($"spicetunnel: websockets bridged={bridged} tunnel error={session.SpiceTunnel?.LastError ?? "none"} " +
-                  $"console={model.Consoles.LastOrDefault()?.Connection.State}");
+                  $"console={model.Consoles.LastOrDefault()?.State}");
+    }
+
+    /// <summary>novnc:&lt;vmid&gt; / shell — opens a running VM's noVNC console (or the first node's
+    /// shell) in a WebView2 tab and saves a PNG of the page (CHILI_DEBUG_SNAPSHOT dir, webview.png).</summary>
+    private async Task DebugWebConsoleAsync(int? vmid)
+    {
+        if (await ReadySessionAsync() is not { } session) { Debug.Log("web: not logged in"); return; }
+        if (vmid is int id)
+        {
+            var vm = session.VMs.FirstOrDefault(v => v.VmId == id);
+            if (vm is not { IsRunning: true }) { Debug.Log($"web: VM {id} not running"); return; }
+            await Consoles.OpenWebConsoleAsync(session, new WebConsoleKind.Vm(vm));
+        }
+        else
+        {
+            var node = (await session.LoadNodesAsync()).First();
+            await Consoles.OpenWebConsoleAsync(session, new WebConsoleKind.NodeShell(node));
+        }
+        for (int i = 0; i < 40 && model.Consoles.LastOrDefault() is { State: ConsoleState.Connecting }; i++) await Task.Delay(500);
+        await Task.Delay(6000);   // let noVNC connect and draw
+        var console = model.Consoles.LastOrDefault() as WebConsoleSession;
+        Debug.Log($"web: state={console?.State} error={console?.ErrorMessage ?? "none"}");
+        if (Debug.SnapshotDir is { } dir && Detail.Content is WebConsoleView { Web.CoreWebView2: { } core })
+        {
+            using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+            await core.CapturePreviewAsync(Microsoft.Web.WebView2.Core.CoreWebView2CapturePreviewImageFormat.Png, stream);
+            var bytes = new byte[stream.Size];
+            stream.Seek(0);
+            await stream.ReadAsync(System.Runtime.InteropServices.WindowsRuntime.WindowsRuntimeBufferExtensions.AsBuffer(bytes),
+                                   (uint)bytes.Length, Windows.Storage.Streams.InputStreamOptions.None);
+            await File.WriteAllBytesAsync(Path.Combine(dir, "webview.png"), bytes);
+            Debug.Log($"web: page title={core.DocumentTitle}");
+        }
     }
 
     /// <summary>cleanup: deletes every machine whose configured name/hostname starts with chili-test-.</summary>

@@ -137,15 +137,18 @@ public sealed partial class ServerSession : ObservableObject
 
     /// <summary>The local end of the Cloudflare Tunnel to spiceproxy, if this server uses one.</summary>
     public TcpOverWebSocket? SpiceTunnel =>
-        Profile.SpiceTunnelHost.Trim().Length == 0 ? null : spiceTunnel ??= new TcpOverWebSocket(Profile.SpiceTunnelHost, AccessHeaders(Profile));
+        Profile.SpiceTunnelHost.Trim().Length == 0 ? null : spiceTunnel ??= new TcpOverWebSocket(Profile.SpiceTunnelHost, AccessHeaders(Profile, spice: true));
 
-    /// <summary>Cloudflare Access service token headers for this server, if it has one.</summary>
-    public static Dictionary<string, string> AccessHeaders(ServerProfile profile)
+    /// <summary>Cloudflare Access service token headers for the Proxmox hostname, or (spice) for the
+    /// SPICE tunnel hostname when the user chose to send the token there too.</summary>
+    public static Dictionary<string, string> AccessHeaders(ServerProfile profile, bool spice = false)
     {
         var headers = new Dictionary<string, string>();
-        if (profile.AccessClientId.Trim().Length > 0 && Credentials.Load(profile.Id, "access") is { Length: > 0 } secret)
+        if (spice && !profile.SpiceTunnelUsesAccess) return headers;
+        var id = profile.AccessClientId.Trim();
+        if (id.Length > 0 && Credentials.Load(profile.Id, "access") is { Length: > 0 } secret)
         {
-            headers["CF-Access-Client-Id"] = profile.AccessClientId.Trim();
+            headers["CF-Access-Client-Id"] = id;
             headers["CF-Access-Client-Secret"] = secret;
         }
         return headers;
