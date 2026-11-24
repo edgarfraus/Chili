@@ -1,13 +1,14 @@
 name: Build (Windows)
 
+# Releases: a v* tag runs build.yml, which calls this workflow and publishes one release with the
+# macOS DMGs and the Windows setup together.
 on:
+  workflow_call:
   push:
     branches: [main]
-    tags: ["windows-v*"]
     paths:
       - "windows/**"
       - ".github/workflows/build-windows.yml"
-      - ".github/release-notes-windows.md"
       - "launcher/Resources/it.lproj/**"
       - "VERSION"
   pull_request:
@@ -27,11 +28,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # windows-v1.2.3 tags set the version; otherwise VERSION (shared with macOS).
+      # VERSION is shared with macOS; a v* tag must match it.
       - name: Version
         shell: bash
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/windows-v* ]]; then v="${GITHUB_REF#refs/tags/windows-v}"; else v="$(cat VERSION)"; fi
+          v="$(tr -d '[:space:]' < VERSION)"
+          if [[ "$GITHUB_REF" == refs/tags/v* && "${GITHUB_REF#refs/tags/v}" != "$v" ]]; then
+            echo "::error::tag ${GITHUB_REF#refs/tags/} doesn't match VERSION ($v)"; exit 1
+          fi
           echo "CHILI_VERSION=$v" >> "$GITHUB_ENV"
 
       # remote-viewer, spice-glib, GTK and GStreamer come from MSYS2.
@@ -106,26 +110,3 @@ jobs:
         with:
           name: smoke-test-screenshot
           path: ${{ runner.temp }}/shots
-
-  release:
-    name: Publish release
-    if: startsWith(github.ref, 'refs/tags/windows-v')
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: windows-x64
-          path: artifacts
-      - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # The macOS release stays "Latest"; this one is listed next to it.
-          gh release create "$GITHUB_REF_NAME" artifacts/* \
-            --title "Chili for Windows ${GITHUB_REF_NAME#windows-v}" \
-            --notes-file .github/release-notes-windows.md \
-            --latest=false --verify-tag

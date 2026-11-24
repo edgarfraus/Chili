@@ -1,25 +1,38 @@
-### What's new in 1.0.2
+### What's new in 1.1.0
 
-- **Cloudflare Access**: a Proxmox hostname protected by Access works with a service token, entered in the
-  new *Cloudflare Access* section of the server settings. Chili sends it with every API request and from
-  the noVNC and shell consoles. An Access login page (or any other login page in front of Proxmox) is now
-  reported clearly instead of as "unexpected response".
-- The SPICE tunnel moved to its own *SPICE tunnel (Cloudflare)* section, independent of Access; a checkbox
-  sends the Access token to the tunnel hostname too (see the [guide](../../#through-a-cloudflare-tunnel)).
+From this version on, **one release carries both apps**: the Mac DMGs and the Windows installer share a
+version number and are published together.
 
-Updating from 1.0.1: **Update Now** in the banner at the top of the window.
+- **Windows users:** install this version by hand once (download the setup below and run it over the
+  existing install; servers and settings are kept). Earlier Windows versions look for the old separate
+  `windows-v…` releases and won't see this one; from 1.1.0 on, **Update Now** works again.
+- **Mac users:** nothing changes; **Update Now** in the banner at the top of the window installs it.
+- Same features on both systems: SPICE console, Cloudflare Tunnel and Cloudflare Access, automatic updates,
+  English and Italian.
 
 ### Download
 
-| Your Mac | File |
+| Your computer | File |
 |---|---|
-| Apple Silicon (M1, M2, M3, M4…) | `Chili-*-arm64.dmg` |
-| Intel | `Chili-*-x86_64.dmg` |
+| Mac with Apple Silicon (M1, M2, M3, M4…) | `Chili-*-arm64.dmg` |
+| Mac with Intel | `Chili-*-x86_64.dmg` |
+| Windows 10 (1809) or later, 64-bit | `Chili-*-x64-setup.exe` |
 
-Not sure? Apple menu → **About This Mac** → look at *Chip* (Apple M…) or *Processor* (Intel).
-
-Open the DMG and drag **Chili** into **Applications**. If macOS refuses to open it the first time,
+**Mac:** not sure which one? Apple menu → **About This Mac** → look at *Chip* (Apple M…) or *Processor*
+(Intel). Open the DMG and drag **Chili** into **Applications**. If macOS refuses to open it the first time,
 go to **System Settings → Privacy & Security** and click **Open Anyway** (see the
 [guide](../../#first-launch)).
 
-`*-sources.tar` contains the exact source code of every bundled component, as required by the GPL.
+**Windows:** run the setup. It installs for your user only (no administrator rights needed; "Install for
+all users" is offered too), adds Chili to the Start menu and, if you leave the options ticked, opens `.vv`
+files and `spice://` links with Chili. On Windows on ARM the x64 build runs under emulation. The installer
+isn't code-signed yet, so Windows may say **"Windows protected your PC"**: click **More info → Run anyway**.
+Not yet on Windows: the Windows key and Alt+Tab go to Windows, not to the VM; there's no settings page yet.
+
+Each file has a `.sha256` next to it, to check it's the one built by GitHub Actions.
+
+### Sources
+
+`Chili-*-sources.tar` (macOS) and `Chili-*-windows-sources.tar` (Chili's source plus the MSYS2 source
+packages of remote-viewer, spice-gtk, GTK, GStreamer…) contain the exact source code of every bundled
+component, as required by the GPL.

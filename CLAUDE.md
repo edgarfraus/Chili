@@ -19,8 +19,8 @@ the status at the end.
   - Opening consoles and reading logs is fine; anything else on their machines needs asking first.
 - **Verify UI visually before handing it over.** SwiftUI layouts broke twice in ways only visible on
   screen (see PLAN.md, "Lessons"). Use the demo mode / previews and look at the result.
-- While the GitHub repo is private, CI minutes cost money (macOS runners count 10×): put `[skip ci]` in
-  commit messages unless a CI run is wanted. Once public, CI is free.
+- The GitHub repo is public, so CI is free, but a macOS build takes 30–60 min: keep `[skip ci]` in commit
+  messages unless a CI run is wanted.
 - End commit messages with the attribution lines given by the harness.
 
 ## Repository layout (macOS)
@@ -76,15 +76,18 @@ see `MainWindow.RunDebugAction` and `DebugActions.cs`).
   dials, power actions, built-in SPICE console (display and guest resize verified; keyboard, mouse,
   clipboard and audio still to be tried by the maintainer), remote-viewer fallback, VM and container
   wizards, history & logs, node journal.
-- Windows releases are separate: tags `windows-v*` → `build-windows.yml` (MSYS2 bundle, tests, publish,
-  smoke test, Inno Setup installer `windows/installer/Chili.iss`, MSYS2 source packages) → a release that
-  is not marked Latest (macOS keeps it). First one: `windows-v1.0.0`. Single instance + `.vv` / `spice://`
+- **One release for both systems** (since 1.1.0): bump `VERSION`, tag `v<version>`; `build.yml` builds the
+  DMGs, calls `build-windows.yml` (MSYS2 bundle, tests, publish, smoke test, Inno Setup installer
+  `windows/installer/Chili.iss`, MSYS2 source packages) and publishes one release with everything and
+  `.github/release-notes.md`. The tag must match `VERSION` (the Windows build checks). Before 1.1.0 Windows
+  had separate `windows-v*` releases (up to `windows-v1.0.4`). Single instance + `.vv` / `spice://`
   associations work; the installer is per user, unsigned (SmartScreen: More info → Run anyway).
   Test installs on the maintainer's PC: pass `/DAppIdGuid={{<another guid>}` to ISCC, or uninstalling the
   test copy removes the real install's uninstall entry (happened once, 2026-11-23). Auto-update: Chili
-  checks GitHub releases (`windows-v*`), verifies the `.sha256`, runs the setup with `/CHILIRESTART=1`.
+  checks GitHub releases (`v*` with a `-x64-setup.exe`), verifies the `.sha256`, runs the setup with `/CHILIRESTART=1`.
 - Windows, next: WebView2 for noVNC/xterm.js/node shell (opened in the browser for now), settings page
   (classic viewer, resize guest, clipboard…; now only in settings.json), Windows key / Alt+Tab capture
   (keyboard hook), arm64 build (MSYS2 CLANGARM64), code signing.
-- CI gotcha: GitHub applies `[skip ci]` to tag pushes too (it reads the tagged commit's message). Start a
-  release build with `gh workflow run build.yml --ref v<version>`.
+- CI gotcha: GitHub applies `[skip ci]` to tag pushes too (it reads the tagged commit's message): leave it
+  out of the release commit (the repo is public, CI is free), or start the build with
+  `gh workflow run build.yml --ref v<version>` (`gh` isn't installed on the Mac).

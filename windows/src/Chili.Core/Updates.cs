@@ -3,20 +3,22 @@ using System.Text.Json.Nodes;
 
 namespace Chili.Core;
 
-/// <summary>A Windows release on GitHub that is newer than the running app.</summary>
+/// <summary>A release on GitHub with a Windows setup that is newer than the running app.</summary>
 public sealed record ReleaseInfo(Version Version, string Tag, string PageUrl, string SetupUrl, string? Sha256Url, string Notes);
 
 /// <summary>
-/// Update checks against the GitHub releases of the project. Windows releases are tagged
-/// <c>windows-v&lt;version&gt;</c> and carry <c>Chili-&lt;version&gt;-&lt;arch&gt;-setup.exe</c> plus a
-/// <c>.sha256</c> file. Drafts and pre-releases are ignored.
+/// Update checks against the GitHub releases of the project. Since 1.1.0 one release per version serves
+/// both systems: tagged <c>v&lt;version&gt;</c>, it carries the macOS DMGs and
+/// <c>Chili-&lt;version&gt;-&lt;arch&gt;-setup.exe</c> plus a <c>.sha256</c> file. Releases without a
+/// setup for this architecture, the old Windows-only <c>windows-v*</c> ones, drafts and pre-releases are
+/// ignored.
 /// </summary>
 public static class Updates
 {
     public const string Repository = "edgarfraus/Chili";
-    private const string TagPrefix = "windows-v";
+    private const string TagPrefix = "v";
 
-    /// <summary>"windows-v1.2.3" → 1.2.3; anything else → null.</summary>
+    /// <summary>"v1.2.3" → 1.2.3; anything else ("windows-v1.0.4", "v1.2-beta") → null.</summary>
     public static Version? ParseTag(string? tag)
     {
         if (tag is null || !tag.StartsWith(TagPrefix, StringComparison.OrdinalIgnoreCase)) return null;
@@ -30,7 +32,7 @@ public static class Updates
     public static Version Normalize(Version v) =>
         new(v.Major, v.Minor, Math.Max(v.Build, 0), Math.Max(v.Revision, 0));
 
-    /// <summary>The newest Windows release in a GitHub /releases response that is newer than
+    /// <summary>The newest release in a GitHub /releases response that is newer than
     /// <paramref name="current"/> and has a setup for <paramref name="arch"/> (x64, arm64).</summary>
     public static ReleaseInfo? Newest(JsonArray releases, Version current, string arch)
     {

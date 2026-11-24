@@ -13,9 +13,9 @@ struct ReleaseInfo: Equatable {
     var versionString: String { Updates.format(version) }
 }
 
-/// Update checks against the project's GitHub releases. macOS releases are tagged `v<version>`
-/// (Windows ones `windows-v<version>`, ignored here) and carry `Chili-<version>-<arch>.dmg` plus a
-/// `.dmg.sha256` file. Drafts and pre-releases are ignored. Same behaviour as the Windows app.
+/// Update checks against the project's GitHub releases. Releases are tagged `v<version>` (since 1.1.0
+/// they also carry the Windows setup; the old Windows-only `windows-v<version>` ones are ignored here) and
+/// carry `Chili-<version>-<arch>.dmg` plus a `.dmg.sha256` file; releases without a DMG for this Mac are skipped. Drafts and pre-releases are ignored. Same behaviour as the Windows app.
 enum Updates {
     static let repository = "edgarfraus/Chili"
 

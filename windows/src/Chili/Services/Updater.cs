@@ -11,7 +11,7 @@ public sealed class Updater
 {
     private static readonly TimeSpan Interval = TimeSpan.FromHours(12);
 
-    /// <summary>The running version (set by the build from VERSION or the windows-v tag).
+    /// <summary>The running version (set by the build from VERSION).
     /// CHILI_DEBUG_UPDATE_CURRENT pretends another one, to test against real releases.</summary>
     public static Version Current { get; } = Updates.Normalize(
         Version.TryParse(Environment.GetEnvironmentVariable("CHILI_DEBUG_UPDATE_CURRENT"), out var fake) ? fake

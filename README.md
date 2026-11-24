@@ -89,7 +89,8 @@ Requirements: macOS 12 Monterey or later.
 
 ### Windows (new)
 
-Chili for Windows is published as separate `windows-v…` releases (see [all releases](../../releases)).
+Chili for Windows comes in the same [releases](../../releases) as the Mac app (from 1.1.0; earlier
+versions were separate `windows-v…` releases).
 Download `Chili-<version>-x64-setup.exe` and run it: it installs for your user without administrator
 rights, adds Chili to the Start menu and opens `.vv` files and `spice://` links. The installer isn't
 code-signed yet: if Windows says *"Windows protected your PC"*, click **More info → Run anyway**.

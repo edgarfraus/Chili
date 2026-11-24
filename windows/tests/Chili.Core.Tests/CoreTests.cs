@@ -352,22 +352,24 @@ public class UpdateTests
 {
     private static System.Text.Json.Nodes.JsonArray Releases() => System.Text.Json.Nodes.JsonNode.Parse("""
         [
-          {"tag_name":"windows-v1.1.0","draft":false,"prerelease":false,"html_url":"https://x/1.1.0","body":"new",
+          {"tag_name":"v1.1.0","draft":false,"prerelease":false,"html_url":"https://x/1.1.0","body":"new",
            "assets":[{"name":"Chili-1.1.0-x64-setup.exe","browser_download_url":"https://x/s110.exe"},
                      {"name":"Chili-1.1.0-x64-setup.exe.sha256","browser_download_url":"https://x/s110.sha"}]},
-          {"tag_name":"windows-v1.2.0","draft":false,"prerelease":true,
+          {"tag_name":"v1.2.0","draft":false,"prerelease":true,
            "assets":[{"name":"Chili-1.2.0-x64-setup.exe","browser_download_url":"https://x/s120.exe"}]},
-          {"tag_name":"windows-v1.3.0","draft":true,"prerelease":false,
+          {"tag_name":"v1.3.0","draft":true,"prerelease":false,
            "assets":[{"name":"Chili-1.3.0-x64-setup.exe","browser_download_url":"https://x/s130.exe"}]},
           {"tag_name":"v2.0.0","draft":false,"prerelease":false,
            "assets":[{"name":"Chili-2.0.0-arm64.dmg","browser_download_url":"https://x/mac.dmg"}]},
-          {"tag_name":"windows-v1.0.1","draft":false,"prerelease":false,
-           "assets":[{"name":"Chili-1.0.1-x64-setup.exe","browser_download_url":"https://x/s101.exe"}]}
+          {"tag_name":"v1.0.1","draft":false,"prerelease":false,
+           "assets":[{"name":"Chili-1.0.1-x64-setup.exe","browser_download_url":"https://x/s101.exe"}]},
+          {"tag_name":"windows-v9.0.0","draft":false,"prerelease":false,
+           "assets":[{"name":"Chili-9.0.0-x64-setup.exe","browser_download_url":"https://x/old.exe"}]}
         ]
         """)!.AsArray();
 
     [Fact]
-    public void PicksNewestPublishedWindowsRelease()
+    public void PicksNewestReleaseWithAWindowsSetup()
     {
         var r = Updates.Newest(Releases(), new Version(1, 0, 0), "x64")!;
         Assert.Equal(new Version(1, 1, 0, 0), r.Version);
@@ -378,10 +380,10 @@ public class UpdateTests
     }
 
     [Theory]
-    [InlineData("windows-v1.0.1", "1.0.1.0")]
-    [InlineData("windows-v2.1", "2.1.0.0")]
-    [InlineData("windows-v1.0.0-beta", null)]
-    [InlineData("v1.0.0", null)]
+    [InlineData("v1.0.1", "1.0.1.0")]
+    [InlineData("v2.1", "2.1.0.0")]
+    [InlineData("v1.0.0-beta", null)]
+    [InlineData("windows-v1.0.4", null)]   // the Windows-only releases before 1.1.0
     public void Tags(string tag, string? version) =>
         Assert.Equal(version, Updates.ParseTag(tag)?.ToString());
 
