@@ -325,10 +325,10 @@
 "Copy image" = "Copia immagine";
 "Download" = "Download";
 
-/* Cloudflare Tunnel */
+/* SPICE tunnel */
 "SPICE tunnel" = "Tunnel SPICE";
-"Cloudflare Tunnel (%@): %@" = "Tunnel Cloudflare (%@): %@";
-"Only if Proxmox is reachable through a Cloudflare Tunnel: the hostname of the tunnel's TCP service for spiceproxy (service: tcp://localhost:3128). Leave empty otherwise." = "Solo se Proxmox è raggiungibile tramite un Cloudflare Tunnel: il nome host del servizio TCP del tunnel per lo spiceproxy (service: tcp://localhost:3128). Altrimenti lascialo vuoto.";
+"SPICE tunnel (%@): %@" = "Tunnel SPICE (%@): %@";
+"Only if the spiceproxy (port 3128) can't be reached directly: a WebSocket that leads to it, such as a Cloudflare Tunnel TCP service (spice.example.com) or websockify (ws://pve.example.com:8443/). Leave empty otherwise." = "Solo se lo spiceproxy (porta 3128) non è raggiungibile direttamente: un WebSocket che porta a esso, come un servizio TCP di un Cloudflare Tunnel (spice.example.com) o websockify (ws://pve.example.com:8443/). Altrimenti lascialo vuoto.";
 
 /* Cloudflare Access */
 "%@ is protected by Cloudflare Access, which Chili can't log in to with a browser page. Create a service token in Cloudflare Zero Trust, allow it with a Service Auth policy, and enter it in the server settings, under Cloudflare Access." = "%@ è protetto da Cloudflare Access, a cui Chili non può accedere con una pagina di login del browser. Crea un service token in Cloudflare Zero Trust, autorizzalo con una policy Service Auth e inseriscilo nelle impostazioni del server, in Cloudflare Access.";
@@ -338,7 +338,7 @@
 "Client ID" = "Client ID";
 "Client Secret" = "Client Secret";
 "Only if Cloudflare Access protects the Proxmox hostname: a service token (Zero Trust → Access → Service credentials) allowed by a Service Auth policy. Used for the API and the web consoles, and for the SPICE tunnel if ticked there." = "Solo se Cloudflare Access protegge il nome host di Proxmox: un service token (Zero Trust → Access → Service credentials) autorizzato da una policy Service Auth. Usato per le API e le console web, e per il tunnel SPICE se lo spunti lì.";
-"SPICE tunnel (Cloudflare)" = "Tunnel SPICE (Cloudflare)";
+"SPICE tunnel (WebSocket)" = "Tunnel SPICE (WebSocket)";
 "Use the Cloudflare Access token for the tunnel too" = "Usa il token di Cloudflare Access anche per il tunnel";
 
 /* Updates */

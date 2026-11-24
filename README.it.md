@@ -216,7 +216,7 @@ Tailscale…) invece di esporle.
 
 Se Proxmox è pubblicato con `cloudflared` ed è raggiungibile solo la porta 8006 (in HTTPS), per SPICE
 serve anche lo spiceproxy. Cloudflare non può trasportarlo come pagina web, ma può farlo come servizio
-TCP, che l'app per Windows raggiunge da sola via WebSocket (senza WARP né `cloudflared` sul PC):
+TCP, che Chili raggiunge da solo via WebSocket, su macOS e Windows (senza WARP né `cloudflared` sul computer):
 
 1. Aggiungi al tunnel un nome host pubblico per lo spiceproxy, di tipo **TCP**: nella dashboard Zero
    Trust, *Networks → Tunnels → il tuo tunnel → Public Hostname → Add*, tipo `TCP`, URL `localhost:3128`;
@@ -231,9 +231,37 @@ TCP, che l'app per Windows raggiunge da sola via WebSocket (senza WARP né `clou
      - service: http_status:404
    ```
    (e `cloudflared tunnel route dns <tunnel> spice.example.com`).
-2. In Chili, modifica il server e inserisci `spice.example.com` in **Tunnel SPICE (Cloudflare) → Hostname**.
+2. In Chili, modifica il server e inserisci `spice.example.com` in **Tunnel SPICE (WebSocket) → Indirizzo**.
 
 Lo spiceproxy accetta comunque solo i ticket monouso che Proxmox rilascia agli utenti autenticati.
+
+#### Tramite un WebSocket, senza Cloudflare (websockify)
+
+Lo stesso tunnel SPICE funziona con qualunque ponte WebSocket ↔ TCP davanti allo spiceproxy, per esempio
+**websockify** sul nodo Proxmox, quando sono aperte solo porte HTTP(S) (un reverse proxy, un firewall che
+lascia passare la 3128 solo in locale…):
+
+1. Sul nodo: `apt install websockify`, poi un servizio che collega la porta 8443 allo spiceproxy,
+   `/etc/systemd/system/spice-websockify.service`:
+   ```ini
+   [Unit]
+   Description=WebSocket bridge to spiceproxy
+   After=spiceproxy.service
+
+   [Service]
+   ExecStart=/usr/bin/websockify 8443 localhost:3128
+   Restart=always
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+   e `systemctl enable --now spice-websockify`.
+2. In Chili, inserisci `ws://pve.example.com:8443/` in **Tunnel SPICE (WebSocket) → Indirizzo**.
+
+La sessione SPICE dentro il tunnel è già cifrata (TLS verso la porta SPICE della VM), quindi `ws://` in
+chiaro va bene. Per `wss://` il ponte deve avere un certificato di cui il computer si fida (quello
+autofirmato di Proxmox qui non viene accettato): mettilo dietro un reverse proxy con un certificato vero,
+per esempio Caddy (`spice.example.com { reverse_proxy localhost:8443 }`), e inserisci `spice.example.com`.
 
 **Dietro Cloudflare Access?** Chili non può compilare la pagina di login di Access nel browser. Crea un
 service token (*Zero Trust → Access → Service credentials → Service Tokens*), aggiungi all'applicazione

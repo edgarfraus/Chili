@@ -30,7 +30,7 @@ public sealed class ServerEditorDialog : ContentDialog
     private readonly CheckBox tunnelUsesAccess = new() { Content = L.T("Use the Cloudflare Access token for the tunnel too") };
     private readonly TextBlock tunnelHint = new()
     {
-        Text = L.T("Only if Proxmox is reachable through a Cloudflare Tunnel: the hostname of the tunnel's TCP service for spiceproxy (service: tcp://localhost:3128). Leave empty otherwise."),
+        Text = L.T("Only if the spiceproxy (port 3128) can't be reached directly: a WebSocket that leads to it, such as a Cloudflare Tunnel TCP service (spice.example.com) or websockify (ws://pve.example.com:8443/). Leave empty otherwise."),
         TextWrapping = TextWrapping.Wrap, Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
         Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
     };
@@ -158,8 +158,8 @@ public sealed class ServerEditorDialog : ContentDialog
         accessRow(L.T("Client ID"), accessId);
         accessRow(L.T("Client Secret"), accessSecret);
         accessRow(null, Form.Caption(L.T("Only if Cloudflare Access protects the Proxmox hostname: a service token (Zero Trust → Access → Service credentials) allowed by a Service Auth policy. Used for the API and the web consoles, and for the SPICE tunnel if ticked there.")));
-        var (tunnelSection, tunnelRow) = Section(L.T("SPICE tunnel (Cloudflare)"), original.SpiceTunnelHost.Length > 0);
-        tunnelRow(L.T("Hostname"), tunnel);
+        var (tunnelSection, tunnelRow) = Section(L.T("SPICE tunnel (WebSocket)"), original.SpiceTunnelHost.Length > 0);
+        tunnelRow(L.T("Address"), tunnel);
         tunnelRow(null, tunnelHint);
         tunnelRow(null, tunnelUsesAccess);
         expander = tunnelSection;

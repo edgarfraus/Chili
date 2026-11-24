@@ -17,7 +17,7 @@ struct ServerProfile: Identifiable, Codable, Hashable {
     var realm = "pam"
     var tokenID = ""            // "user@realm!name"
     var rememberSecret = true
-    /// Hostname of a Cloudflare Tunnel TCP service for spiceproxy (port 3128), when the server is only
+    /// A WebSocket leading to spiceproxy (port 3128) — a Cloudflare Tunnel TCP service, websockify… — when it is only
     /// reachable through the tunnel. Empty: SPICE goes to host:3128 directly.
     var spiceTunnelHost = ""
     /// Client ID of a Cloudflare Access service token for the Proxmox hostname (API and web consoles);

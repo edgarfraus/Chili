@@ -227,9 +227,37 @@ reaches over WebSocket by itself, on macOS and Windows (no WARP or `cloudflared`
      - service: http_status:404
    ```
    (and `cloudflared tunnel route dns <tunnel> spice.example.com`).
-2. In Chili, edit the server and enter `spice.example.com` under **SPICE tunnel (Cloudflare) → Hostname**.
+2. In Chili, edit the server and enter `spice.example.com` under **SPICE tunnel (WebSocket) → Address**.
 
 The spiceproxy itself only accepts the one-time tickets Proxmox issues to logged-in users.
+
+#### Through a WebSocket, without Cloudflare (websockify)
+
+The same SPICE tunnel works with any WebSocket ↔ TCP bridge in front of the spiceproxy, for example
+**websockify** on the Proxmox node, when only HTTP(S) ports are open (a reverse proxy, a firewall that
+lets 3128 through only locally…):
+
+1. On the node: `apt install websockify`, then a service that bridges port 8443 to the spiceproxy,
+   `/etc/systemd/system/spice-websockify.service`:
+   ```ini
+   [Unit]
+   Description=WebSocket bridge to spiceproxy
+   After=spiceproxy.service
+
+   [Service]
+   ExecStart=/usr/bin/websockify 8443 localhost:3128
+   Restart=always
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+   and `systemctl enable --now spice-websockify`.
+2. In Chili, enter `ws://pve.example.com:8443/` under **SPICE tunnel (WebSocket) → Address**.
+
+The SPICE session inside the tunnel is already encrypted (TLS to the VM's SPICE port), so plain `ws://` is
+fine. For `wss://` the bridge needs a certificate the computer trusts (Proxmox' self-signed one isn't
+accepted here): put it behind a reverse proxy with a real certificate, e.g. Caddy
+(`spice.example.com { reverse_proxy localhost:8443 }`), and enter `spice.example.com`.
 
 **Behind Cloudflare Access?** Chili can't fill in Access' browser login page. Create a service token
 (*Zero Trust → Access → Service credentials → Service Tokens*), add a policy with the action **Service Auth**

@@ -1,9 +1,10 @@
 import Foundation
 import Network
 
-/// Reaches Proxmox' spiceproxy (TCP 3128) through a Cloudflare Tunnel without any client software:
-/// the tunnel publishes it as `service: tcp://localhost:3128` on its own hostname, and Cloudflare
-/// carries such services as WebSocket streams over HTTPS (what `cloudflared access tcp` does).
+/// Reaches Proxmox' spiceproxy (TCP 3128) through any WebSocket↔TCP bridge: websockify, or a Cloudflare
+/// Tunnel without any client software (the tunnel publishes it as `service: tcp://localhost:3128` on its
+/// own hostname, and Cloudflare carries such services as WebSocket streams over HTTPS, which is what
+/// `cloudflared access tcp` does).
 /// This listens on 127.0.0.1 and pipes every accepted connection through its own WebSocket to
 /// `wss://<host>/` in binary frames. SPICE then uses `proxy=http://127.0.0.1:<port>`.
 /// Same design as the Windows app (`TcpOverWebSocket.cs`).

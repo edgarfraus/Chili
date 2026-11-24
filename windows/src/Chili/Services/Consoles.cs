@@ -56,7 +56,7 @@ public sealed class Consoles(AppModel model, MainWindow window)
             }
             var tunnel = session.SpiceTunnel;
             await OpenSpiceAsync(config, $"{vm.DisplayName} ({vm.VmId})", () => session.SpiceConfigAsync(vm),
-                                 tunnel is null ? null : () => tunnel.LastError is { } e ? L.F("Cloudflare Tunnel (%@): %@", session.Profile.SpiceTunnelHost, e) : null);
+                                 tunnel is null ? null : () => tunnel.LastError is { } e ? L.F("SPICE tunnel (%@): %@", session.Profile.SpiceTunnelHost, e) : null);
         }
         catch (Exception e) { await model.PresentAsync(e); }
         finally { if (item is not null) item.Busy = false; }

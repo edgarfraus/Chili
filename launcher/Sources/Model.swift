@@ -279,7 +279,7 @@ final class ServerSession: ObservableObject {
     private var spiceTunnel: TcpOverWebSocket?
     private let accessSecretOverride: String?
 
-    /// The local end of the Cloudflare Tunnel to spiceproxy, if this server uses one.
+    /// The local end of the WebSocket tunnel to spiceproxy, if this server uses one.
     var tunnel: TcpOverWebSocket? {
         let host = profile.spiceTunnelHost.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !host.isEmpty else { return nil }
@@ -297,7 +297,7 @@ final class ServerSession: ObservableObject {
         return ["CF-Access-Client-Id": id, "CF-Access-Client-Secret": secret]
     }
 
-    /// A SPICE ticket for the VM, routed through the Cloudflare Tunnel when configured.
+    /// A SPICE ticket for the VM, routed through the WebSocket tunnel when configured.
     func spiceConfig(for vm: ProxmoxVM) async throws -> ViewerConfig {
         var config = try await client.spiceConfig(for: vm)
         if let tunnel {
@@ -312,7 +312,7 @@ final class ServerSession: ObservableObject {
         guard let tunnel else { return nil }
         let host = profile.spiceTunnelHost
         return {
-            tunnel.lastError.map { String(format: NSLocalizedString("Cloudflare Tunnel (%@): %@", comment: ""), host, $0) }
+            tunnel.lastError.map { String(format: NSLocalizedString("SPICE tunnel (%@): %@", comment: ""), host, $0) }
         }
     }
 

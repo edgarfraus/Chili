@@ -599,12 +599,12 @@ struct ServerEditor: View {
                 .padding(.top, 6)
                 .padding(.leading, 18)
             }
-            DisclosureGroup("SPICE tunnel (Cloudflare)", isExpanded: $showTunnel) {
+            DisclosureGroup("SPICE tunnel (WebSocket)", isExpanded: $showTunnel) {
                 VStack(alignment: .leading, spacing: 8) {
                     Form {
-                        TextField("Hostname", text: $profile.spiceTunnelHost, prompt: Text(verbatim: "spice.example.com"))
+                        TextField("Address", text: $profile.spiceTunnelHost, prompt: Text(verbatim: "spice.example.com"))
                     }
-                    caption("Only if Proxmox is reachable through a Cloudflare Tunnel: the hostname of the tunnel's TCP service for spiceproxy (service: tcp://localhost:3128). Leave empty otherwise.")
+                    caption("Only if the spiceproxy (port 3128) can't be reached directly: a WebSocket that leads to it, such as a Cloudflare Tunnel TCP service (spice.example.com) or websockify (ws://pve.example.com:8443/). Leave empty otherwise.")
                     Toggle("Use the Cloudflare Access token for the tunnel too", isOn: $profile.spiceTunnelUsesAccess)
                 }
                 .padding(.top, 6)

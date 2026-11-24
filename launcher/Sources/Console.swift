@@ -18,7 +18,7 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
 
     /// SPICE: fetches fresh connection options (Proxmox tickets are single-use).
     private let reconnectOptions: (() async throws -> ViewerConfig)?
-    /// SPICE: extra detail for the "Disconnected" message (the Cloudflare Tunnel's last error).
+    /// SPICE: extra detail for the "Disconnected" message (the SPICE tunnel's last error).
     private let diagnostic: (() -> String?)?
     /// Web: fresh login cookie + URL, since Proxmox tickets expire.
     private let webReload: (() async throws -> (URL, HTTPCookie?))?
