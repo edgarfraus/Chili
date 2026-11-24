@@ -2,7 +2,7 @@
 
 Chili is an unofficial SPICE client and Proxmox VE companion. The macOS app is released; the
 **Windows version** is in progress in `windows/` — see [`docs/windows/PLAN.md`](docs/windows/PLAN.md) and
-the status at the end.
+the status at the end; next for a Windows session: [`docs/windows/HANDOFF.md`](docs/windows/HANDOFF.md).
 **macOS** caught up with Windows on 2026-11-23 (SPICE through a Cloudflare Tunnel, automatic updates, v1.0.1 released; Cloudflare Access on 2026-11-24; see
 [`docs/macos/HANDOFF.md`](docs/macos/HANDOFF.md)); v1.0.2 released; since v1.1.0 (2026-11-24) one release carries both apps.
 
