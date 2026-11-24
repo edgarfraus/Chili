@@ -56,9 +56,12 @@ Everything is on `main`; pull it first.
   dialog keeps its width, nothing is cut off.
 - **Tunnel regression:** `spicetunnel:102` (W2025, already running; no input sent): 4 WebSockets bridged,
   no tunnel error, console connected.
-- **websockify:** not tried yet — it needs Python and `pip install websockify` on the maintainer's PC,
-  which waits for their OK. `DebugSpiceTunnelAsync` now honours `CHILI_DEBUG_TUNNEL_URL` (e.g.
-  `ws://localhost:6080/`) to use an external bridge instead of the in-process one.
+- **websockify: works as is.** With the maintainer's OK: Python 3.13 (winget, per user) and websockify
+  0.13.0 in a scratch venv, `websockify 127.0.0.1:6080 192.168.250.104:3128`, then
+  `CHILI_DEBUG_TUNNEL_URL=ws://localhost:6080/ CHILI_DEBUG_ACTION=spicetunnel:102`: websockify accepted
+  Chili's 4 WebSockets (one per SPICE channel) **without a subprotocol**, and the console connected.
+  So no `binary` subprotocol is needed, on Windows or in `Tunnel.swift`. `DebugSpiceTunnelAsync` honours
+  `CHILI_DEBUG_TUNNEL_URL` to use such an external bridge instead of the in-process one.
 - **New: Info page** (sidebar footer, `Views/InfoView.cs`): version and architecture, updates (status,
   *Check for Updates* — works even with automatic checks off —, the automatic-check preference, *Update Now*
   when a newer release is known), links (project, this version's release notes, releases, issues, source),
