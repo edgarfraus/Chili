@@ -480,3 +480,116 @@ public class CloudflareAccessTests
         public bool IsTrusted(string host, int port, string fingerprint) => false;
     }
 }
+
+public class WebConsoleProxyTests
+{
+    private static readonly Dictionary<string, string> Token = new() { ["CF-Access-Client-Id"] = "id", ["CF-Access-Client-Secret"] = "secret" };
+
+    /// <summary>A plain HTTP server standing in for Proxmox: echoes what the proxy sent, and
+    /// echoes WebSocket messages.</summary>
+    private static (System.Net.HttpListener Server, int Port) Upstream()
+    {
+        int port = FreePort();
+        var http = new System.Net.HttpListener();
+        http.Prefixes.Add($"http://localhost:{port}/");
+        http.Start();
+        _ = Task.Run(async () =>
+        {
+            while (http.IsListening)
+            {
+                System.Net.HttpListenerContext ctx;
+                try { ctx = await http.GetContextAsync(); } catch { return; }
+                _ = Task.Run(async () =>
+                {
+                    var seen = $"{ctx.Request.HttpMethod} {ctx.Request.Url!.PathAndQuery} host={ctx.Request.Headers["Host"]} " +
+                               $"id={ctx.Request.Headers["CF-Access-Client-Id"]} secret={ctx.Request.Headers["CF-Access-Client-Secret"]} " +
+                               $"origin={ctx.Request.Headers["Origin"]}";
+                    if (ctx.Request.IsWebSocketRequest)
+                    {
+                        var ws = (await ctx.AcceptWebSocketAsync(null)).WebSocket;
+                        await ws.SendAsync(Encoding.UTF8.GetBytes(seen), System.Net.WebSockets.WebSocketMessageType.Text, true, default);
+                        var buf = new byte[4096];
+                        var r = await ws.ReceiveAsync(buf, default);
+                        await ws.SendAsync(buf.AsMemory(0, r.Count), System.Net.WebSockets.WebSocketMessageType.Binary, true, default);
+                        await ws.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, null, default);
+                        return;
+                    }
+                    var body = await new StreamReader(ctx.Request.InputStream).ReadToEndAsync();
+                    var bytes = Encoding.UTF8.GetBytes(seen + (body.Length > 0 ? $" body={body}" : ""));
+                    ctx.Response.ContentLength64 = bytes.Length;
+                    await ctx.Response.OutputStream.WriteAsync(bytes);
+                    ctx.Response.Close();
+                });
+            }
+        });
+        return (http, port);
+    }
+
+    private static WebConsoleProxy Proxy(int port) =>
+        new(new Uri($"http://localhost:{port}/"), Token, (_, _, _, _) => true);
+
+    /// <summary>Requests get the token and the Proxmox host name; the browser may reuse
+    /// connections, so several requests in a row (and a body) must all get through.</summary>
+    [Fact]
+    public async Task ForwardsRequestsWithHeaders()
+    {
+        var (server, port) = Upstream();
+        using var _ = server;
+        using var proxy = Proxy(port);
+        using var client = new HttpClient(new SocketsHttpHandler
+        {
+            SslOptions = { RemoteCertificateValidationCallback = (_, c, _, _) => c is not null && ProxmoxClient.Fingerprint(c) == proxy.Fingerprint },
+        });
+        var page = proxy.Local(new Uri($"http://localhost:{port}/?console=kvm&novnc=1"));
+        Assert.Equal($"https://127.0.0.1:{proxy.Port}/?console=kvm&novnc=1", page.AbsoluteUri);
+        for (int i = 0; i < 3; i++)
+        {
+            var text = await client.GetStringAsync(page);
+            Assert.Equal($"GET /?console=kvm&novnc=1 host=localhost:{port} id=id secret=secret origin=", text);
+        }
+        var post = new HttpRequestMessage(HttpMethod.Post, new Uri(page, "/api2/json/x")) { Content = new StringContent("a=1") };
+        post.Headers.Add("Origin", $"https://127.0.0.1:{proxy.Port}");
+        var answer = await (await client.SendAsync(post)).Content.ReadAsStringAsync();
+        Assert.Equal($"POST /api2/json/x host=localhost:{port} id=id secret=secret origin=http://localhost:{port} body=a=1", answer);
+    }
+
+    /// <summary>The point of the proxy: the console's WebSocket carries the token too.</summary>
+    [Fact]
+    public async Task ForwardsWebSocketsWithHeaders()
+    {
+        var (server, port) = Upstream();
+        using var _ = server;
+        using var proxy = Proxy(port);
+        using var ws = new System.Net.WebSockets.ClientWebSocket();
+        ws.Options.RemoteCertificateValidationCallback = (_, c, _, _) => c is not null && ProxmoxClient.Fingerprint(c) == proxy.Fingerprint;
+        ws.Options.SetRequestHeader("Origin", $"https://127.0.0.1:{proxy.Port}");
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await ws.ConnectAsync(new Uri($"wss://127.0.0.1:{proxy.Port}/api2/json/nodes/pve/qemu/100/vncwebsocket?port=5900"), cts.Token);
+        var buf = new byte[4096];
+        var r = await ws.ReceiveAsync(buf, cts.Token);
+        Assert.Equal($"GET /api2/json/nodes/pve/qemu/100/vncwebsocket?port=5900 host=localhost:{port} id=id secret=secret origin=http://localhost:{port}",
+                     Encoding.UTF8.GetString(buf, 0, r.Count));
+        await ws.SendAsync(new byte[] { 1, 2, 3 }, System.Net.WebSockets.WebSocketMessageType.Binary, true, cts.Token);
+        r = await ws.ReceiveAsync(buf, cts.Token);
+        Assert.Equal(new byte[] { 1, 2, 3 }, buf[..r.Count]);
+    }
+
+    [Fact]
+    public async Task ReportsUnreachableHost()
+    {
+        using var proxy = Proxy(FreePort());
+        using var client = new HttpClient(new SocketsHttpHandler { SslOptions = { RemoteCertificateValidationCallback = (_, _, _, _) => true } });
+        var response = await client.GetAsync($"https://127.0.0.1:{proxy.Port}/");
+        Assert.Equal(System.Net.HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.NotNull(proxy.LastError);
+    }
+
+    private static int FreePort()
+    {
+        var l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        l.Start();
+        int port = ((System.Net.IPEndPoint)l.LocalEndpoint).Port;
+        l.Stop();
+        return port;
+    }
+}

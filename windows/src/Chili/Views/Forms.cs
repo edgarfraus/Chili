@@ -135,7 +135,13 @@ public sealed class Form
             box.Items.Add(item);
             if (value is not null && EqualityComparer<T>.Default.Equals(value, selected)) box.SelectedItem = item;
         }
-        box.SelectionChanged += (_, _) => { if (box.SelectedItem is ComboBoxItem { Tag: T v }) set(v); };
+        // Only real changes: callers often rebuild the form, which must not loop.
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedItem is not ComboBoxItem { Tag: T v } || EqualityComparer<T>.Default.Equals(v, selected)) return;
+            selected = v;
+            set(v);
+        };
         Row(label, box, target);
         return box;
     }
@@ -145,8 +151,16 @@ public sealed class Form
         var list = items.ToList();
         var radios = new RadioButtons { MaxColumns = list.Count };
         foreach (var (text, _) in list) radios.Items.Add(text);
-        radios.SelectedIndex = Math.Max(0, list.FindIndex(i => EqualityComparer<T>.Default.Equals(i.Value, selected)));
-        radios.SelectionChanged += (_, _) => { if (radios.SelectedIndex >= 0) set(list[radios.SelectedIndex].Value); };
+        var current = Math.Max(0, list.FindIndex(i => EqualityComparer<T>.Default.Equals(i.Value, selected)));
+        radios.SelectedIndex = current;
+        // RadioButtons raises SelectionChanged again once it's loaded; callers that rebuild the form
+        // on a change would then rebuild forever (the container wizard flickered and ignored clicks).
+        radios.SelectionChanged += (_, _) =>
+        {
+            if (radios.SelectedIndex < 0 || radios.SelectedIndex == current) return;
+            current = radios.SelectedIndex;
+            set(list[current].Value);
+        };
         Row(label, radios, target);
         return radios;
     }

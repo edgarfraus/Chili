@@ -11,7 +11,8 @@ namespace Chili.Views;
 
 /// <summary>Proxmox' noVNC / xterm.js console inside Chili (WebView2). Logged in with the session's
 /// ticket cookie; Proxmox' self-signed certificate is accepted only when its fingerprint is the one
-/// the user trusted for the API; the Cloudflare Access service token, if any, rides along.</summary>
+/// the user trusted for the API. With a Cloudflare Access service token the page goes through a
+/// <see cref="WebConsoleProxy"/> on 127.0.0.1 that adds the token to every request, WebSocket included.</summary>
 public sealed class WebConsoleView : UserControl
 {
     private readonly WebConsoleSession session;
@@ -22,6 +23,10 @@ public sealed class WebConsoleView : UserControl
     private readonly TextBlock reason = new() { TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, IsTextSelectionEnabled = true };
     private readonly ProgressRing loading = new() { IsActive = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     private Uri? url;
+    private WebConsoleProxy? proxy;
+    /// <summary>The browser being set up: Loaded can fire again before that finishes.</summary>
+    private Task<CoreWebView2>? creating;
+    private bool started;
 
     public WebConsoleSession Session => session;
     /// <summary>For debug snapshots: the WebView2 renders outside the XAML tree.</summary>
@@ -78,7 +83,8 @@ public sealed class WebConsoleView : UserControl
         browser.Click += async (_, _) => { if (url is not null) await Windows.System.Launcher.LaunchUriAsync(url); };
         disconnect.Click += (_, _) => window.CloseConsole(session);
         session.Closed += Teardown;
-        Loaded += async (_, _) => { if (web is null) await LoadAsync(); };
+        // Loaded fires again when the tab moves or is shown again: load once.
+        Loaded += async (_, _) => { if (started) return; started = true; await LoadAsync(); };
     }
 
     private async Task LoadAsync()
@@ -91,20 +97,26 @@ public sealed class WebConsoleView : UserControl
             var (target, cookie) = await session.PrepareAsync();
             url = target;
             var core = await EnsureWebViewAsync();
-            var c = core.CookieManager.CreateCookie("PVEAuthCookie", cookie, session.Server.Api.Host.Trim('[', ']'), "/");
+            var headers = ServerSession.AccessHeaders(session.Server.Profile);
+            if (headers.Count > 0)
+                proxy ??= new WebConsoleProxy(new Uri(target.GetLeftPart(UriPartial.Authority)), headers, session.Server.Api.AcceptsCertificate);
+            var page = proxy?.Local(target) ?? target;
+            var c = core.CookieManager.CreateCookie("PVEAuthCookie", cookie, page.Host.Trim('[', ']'), "/");
             c.IsSecure = true;
             core.CookieManager.AddOrUpdateCookie(c);
-            core.Navigate(target.AbsoluteUri);
+            core.Navigate(page.AbsoluteUri);
         }
         catch (Exception e)
         {
+            if (creating is { IsFaulted: true }) creating = null;   // try again on Reload
             Fail(e.Message);
         }
     }
 
-    private async Task<CoreWebView2> EnsureWebViewAsync()
+    private Task<CoreWebView2> EnsureWebViewAsync() => creating ??= CreateWebViewAsync();
+
+    private async Task<CoreWebView2> CreateWebViewAsync()
     {
-        if (web?.CoreWebView2 is { } existing) return existing;
         // One profile folder per server keeps cookies (and an Access login) separate.
         var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                                   "Chili", "WebView2", session.Server.Profile.Id.ToString("N"));
@@ -119,12 +131,13 @@ public sealed class WebConsoleView : UserControl
         var api = session.Server.Api;
         core.ServerCertificateErrorDetected += (_, e) =>
         {
-            // Accept Proxmox' self-signed certificate only if it's the one pinned for the API.
+            // Accept Proxmox' self-signed certificate only if it's the one pinned for the API
+            // (or our own console proxy's).
             try
             {
                 using var cert = X509Certificate2.CreateFromPem(e.ServerCertificate.ToPemEncoding());
                 var fp = ProxmoxClient.Fingerprint(cert);
-                e.Action = App.Model.Settings.IsTrusted(api.Host, api.Port, fp)
+                e.Action = App.Model.Settings.IsTrusted(api.Host, api.Port, fp) || fp == proxy?.Fingerprint
                     ? CoreWebView2ServerCertificateErrorAction.AlwaysAllow
                     : CoreWebView2ServerCertificateErrorAction.Cancel;
             }
@@ -136,16 +149,7 @@ public sealed class WebConsoleView : UserControl
             e.Handled = true;
             if (Uri.TryCreate(e.Uri, UriKind.Absolute, out var u)) await Windows.System.Launcher.LaunchUriAsync(u);
         };
-        // Cloudflare Access service token on every request to the Proxmox hostname.
-        var headers = ServerSession.AccessHeaders(session.Server.Profile);
-        if (headers.Count > 0)
-        {
-            core.AddWebResourceRequestedFilter($"https://{api.Host.Trim('[', ']')}*", CoreWebView2WebResourceContext.All);
-            core.WebResourceRequested += (_, e) =>
-            {
-                foreach (var (k, v) in headers) e.Request.Headers.SetHeader(k, v);
-            };
-        }
+        if (Services.Debug.Action is not null) await LogWebSocketsAsync(core);
         core.NavigationCompleted += (_, e) =>
         {
             if (e.IsSuccess)
@@ -163,6 +167,19 @@ public sealed class WebConsoleView : UserControl
         return core;
     }
 
+    /// <summary>Debug only: logs the page's WebSockets (URL, handshake status, errors) through the
+    /// DevTools protocol, to see what reaches Proxmox or Cloudflare.</summary>
+    private static async Task LogWebSocketsAsync(CoreWebView2 core)
+    {
+        await core.CallDevToolsProtocolMethodAsync("Network.enable", "{}");
+        void On(string name, Func<System.Text.Json.Nodes.JsonNode, string?> describe) =>
+            core.GetDevToolsProtocolEventReceiver(name).DevToolsProtocolEventReceived += (_, e) =>
+                Services.Debug.Log($"web: {name[8..]} {describe(System.Text.Json.Nodes.JsonNode.Parse(e.ParameterObjectAsJson)!)}");
+        On("Network.webSocketCreated", j => (string?)j["url"] is { } u ? u.Split('?')[0] : null);
+        On("Network.webSocketHandshakeResponseReceived", j => j["response"]?["status"]?.ToString());
+        On("Network.webSocketFrameError", j => (string?)j["errorMessage"]);
+    }
+
     private void Fail(string message)
     {
         loading.Visibility = Visibility.Collapsed;
@@ -176,6 +193,9 @@ public sealed class WebConsoleView : UserControl
     private void Teardown()
     {
         session.Closed -= Teardown;
+        proxy?.Dispose();
+        proxy = null;
+        creating = null;
         if (web is null) return;
         stage.Children.Remove(web);
         web.Close();

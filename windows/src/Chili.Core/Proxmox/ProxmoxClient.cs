@@ -490,6 +490,11 @@ public sealed class ProxmoxClient : IDisposable
 
     // MARK: TLS — Proxmox ships a self-signed certificate, so we trust on first use
 
+    /// <summary>The API's rule for other connections to this host (the web console proxy): a valid
+    /// certificate, or the one the user pinned.</summary>
+    public bool AcceptsCertificate(object sender, X509Certificate? certificate, X509Chain? chain, SslPolicyErrors errors) =>
+        errors == SslPolicyErrors.None || certificate is not null && trust.IsTrusted(Host, Port, Fingerprint(certificate));
+
     private bool ValidateCertificate(object sender, X509Certificate? certificate, X509Chain? chain, SslPolicyErrors errors)
     {
         if (errors == SslPolicyErrors.None) return true;
