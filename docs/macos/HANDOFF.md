@@ -11,6 +11,16 @@ when `spiceTunnelUsesAccess`, editor sections). Tested on EDG_Lab with a made-up
 login OK, 4/4 tunnel handshakes with the headers, SPICE and noVNC connected) and offline (`accesscheck`). Not
 tested against a real Access application (the maintainer has none set up yet). Next: release v1.0.2.
 
+**Open (2026-11-26), found on Windows against the maintainer's real Access application:** with a service token
+Access never sets `CF_Authorization` (checked: no `Set-Cookie` on the page or the API), and the web view can't add
+headers to the noVNC / xterm.js **WebSocket**, so it gets a 403 and noVNC says "Failed to connect to server".
+The macOS design above (headers on navigations, then the cookie) has the same hole. Windows fix:
+`windows/src/Chili.Core/Proxmox/WebConsoleProxy.cs` — an HTTPS proxy on 127.0.0.1 with a throwaway self-signed
+certificate (accepted by fingerprint), one request per connection (`Connection: close`, so no body parsing),
+WebSocket upgrades piped through; it rewrites Host/Origin/Referer and adds the headers. Used only when the
+profile has a token. Tests: `WebConsoleProxyTests`. Port it to `Console.swift` (Network.framework listener,
+`NWProtocolTLS` with a generated identity, accept it in `didReceive challenge` by fingerprint).
+
 State at handoff: macOS `v1.0.0` released (both DMGs, sources). Windows `windows-v1.0.1` released with
 everything below. All work is on `main`.
 
