@@ -1,11 +1,17 @@
-### What's new in 1.1.2
+### What's new in 1.1.3
 
-- **Mac: Info page**, like on Windows: the *Info* button at the bottom of the sidebar (or *About Chili* in the
-  Chili menu) shows the version, *Check for Updates* (also with automatic checks off), links to the release
-  notes, issues and source, the bundled components and their versions, and buttons for the settings and logs.
-- From 1.1.1: the **SPICE tunnel works through any WebSocket bridge**, not only a Cloudflare Tunnel (also
-  **websockify** on the Proxmox node, tested; see the README, *Network requirements*), and Windows got its
-  Info page.
+Windows fixes:
+
+- **noVNC and the shell through Cloudflare Access** now connect: with a service token the console's
+  WebSocket was refused ("Failed to connect to server"). Chili now routes the console through a small proxy
+  on your own computer that adds the token to every request.
+- **The session no longer expires:** Chili renews its Proxmox login every hour, and after a long standby
+  **Refresh** (and the automatic refresh) logs in again by itself. With two-factor authentication it asks
+  for the code.
+- **New Container** no longer flickers and ignores clicks.
+
+On the Mac, noVNC through Cloudflare Access with a service token probably fails the same way; the fix
+will come in a later version.
 
 One release carries both apps: the Mac DMGs and the Windows installer share a version number.
 
