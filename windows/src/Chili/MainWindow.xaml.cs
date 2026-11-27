@@ -454,6 +454,9 @@ public sealed partial class MainWindow : Window
             case "shell":
                 await DebugWebConsoleAsync(null);
                 break;
+            case var x when x.StartsWith("expire:"):
+                await DebugExpireAsync(x[7..]);
+                break;
             case "cleanup":
                 await DebugCleanupAsync();
                 break;

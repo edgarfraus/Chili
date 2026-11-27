@@ -66,7 +66,7 @@ Build: `dotnet build windows/src/Chili/Chili.csproj -p:Platform=x64`; tests: `do
 Same dev aids as on macOS: `CHILI_DEMO`, `CHILI_LANG=it|en`, `CHILI_DEBUG_SNAPSHOT` (rendered from the XAML
 tree, so it works in a disconnected RDP session), `CHILI_DEBUG_ACTION` (`editor`, `edit`, `quick`, `login`,
 `cert`, `alert`, `wizard[-custom|-win]`, `ctwizard`, `logs`, `syslog`, `spice:<id>` with optional
-`CHILI_DEBUG_CLOSE_AFTER=<s>`, live tests `create:<linux,win11,win11-nodrivers,custom>`, `ctcreate`, `cleanup`;
+`CHILI_DEBUG_CLOSE_AFTER=<s>`, `expire:<server name>` (expired ticket + Refresh: must log in again by itself), live tests `create:<linux,win11,win11-nodrivers,custom>`, `ctcreate`, `cleanup`;
 see `MainWindow.RunDebugAction` and `DebugActions.cs`).
 
 ## Status (2026-11-22)

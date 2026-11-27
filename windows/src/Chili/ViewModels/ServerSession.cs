@@ -157,7 +157,7 @@ public sealed partial class ServerSession : ObservableObject
     /// <summary>A SPICE ticket for the VM, routed through the Cloudflare Tunnel when configured.</summary>
     public async Task<ViewerConfig> SpiceConfigAsync(ProxmoxVM vm)
     {
-        var config = await client.SpiceConfigAsync(vm);
+        var config = await WithLoginAsync(() => client.SpiceConfigAsync(vm));
         if (SpiceTunnel is { } tunnel) config["proxy"] = $"http://127.0.0.1:{tunnel.Port}";
         return config;
     }
@@ -170,14 +170,78 @@ public sealed partial class ServerSession : ObservableObject
         ApplyFilter();
     }
 
+    /// <summary>The Refresh button: reloads, logging in again first if the session has expired.</summary>
     public async void Refresh()
     {
         try
         {
-            await ReloadAsync();
+            await WithLoginAsync(ReloadAsync);
             LastError = null;
         }
+        catch (SessionExpiredException) { }
         catch (Exception e) { LastError = e.Message; }
+    }
+
+    /// <summary>Proxmox tickets last two hours: renew after one (a ticket buys a new one, no password or
+    /// 2FA code needed). No-op with an API token.</summary>
+    private static readonly TimeSpan TicketRenewal = TimeSpan.FromHours(1);
+
+    public async Task RenewTicketIfOldAsync()
+    {
+        if (client.TicketIssued is { } issued && DateTime.UtcNow - issued > TicketRenewal)
+            await client.RenewTicketAsync(Profile.FullUsername);
+    }
+
+    /// <summary>Runs <paramref name="action"/>; if Proxmox refuses the ticket (expired: the PC slept,
+    /// or Chili stayed open without network), logs in again with the password and retries once.
+    /// With 2FA, or without a password at hand, shows the login form and throws
+    /// <see cref="SessionExpiredException"/>.</summary>
+    public async Task<T> WithLoginAsync<T>(Func<Task<T>> action)
+    {
+        try
+        {
+            await RenewTicketIfOldAsync();
+            return await action();
+        }
+        catch (HttpProxmoxException e) when (e.Status == 401 && client.UsesTicket && Profile.Auth == ServerProfile.AuthMethod.Password)
+        {
+            var pending = relogin ??= ReloginAsync();   // the timer and the button may both get here
+            try { await pending; }
+            finally { if (relogin == pending) relogin = null; }
+            return await action();
+        }
+    }
+
+    public Task WithLoginAsync(Func<Task> action) => WithLoginAsync(async () => { await action(); return true; });
+
+    private Task? relogin;
+
+    private async Task ReloginAsync()
+    {
+        var secret = password.Length > 0 ? password : StoredSecret ?? "";
+        if (secret.Length == 0) Expired(SessionState.LoggedOut);
+        try
+        {
+            await client.LoginAsync(Profile.FullUsername, secret);
+            if (password.Length == 0) password = secret;
+        }
+        catch (NeedsTotpException)
+        {
+            password = secret;   // the login form then asks only for the code
+            Expired(SessionState.NeedsOtp);
+        }
+        catch (HttpProxmoxException e) when (e.Status == 401)
+        {
+            Expired(SessionState.LoggedOut);   // the password changed meanwhile
+        }
+    }
+
+    private void Expired(SessionState state)
+    {
+        refreshTimer?.Stop();
+        State = state;
+        LastError = L.T("The session has expired: log in again.");
+        throw new SessionExpiredException();
     }
 
     private void StartAutoRefresh()
@@ -195,7 +259,8 @@ public sealed partial class ServerSession : ObservableObject
     {
         if (refreshing || State != SessionState.Ready) return;
         refreshing = true;
-        try { await ReloadAsync(); LastError = null; }
+        try { await WithLoginAsync(ReloadAsync); LastError = null; }
+        catch (SessionExpiredException) { }
         catch (Exception e) { LastError = e.Message; }
         finally { refreshing = false; }
     }
@@ -327,3 +392,7 @@ public sealed partial class ServerSession : ObservableObject
 
     public VmItem? ItemFor(ProxmoxVM vm) => items.GetValueOrDefault(vm.Id);
 }
+
+/// <summary>The session's ticket expired and logging in again needs the user (2FA code, or no
+/// password at hand): the login form is showing.</summary>
+public sealed class SessionExpiredException() : ProxmoxException(L.T("The session has expired: log in again."));

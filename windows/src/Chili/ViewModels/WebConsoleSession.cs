@@ -28,7 +28,8 @@ public sealed class WebConsoleSession : IConsole
     public async Task<(Uri Url, string Cookie)> PrepareAsync()
     {
         var api = Server.Api;
-        await api.RenewTicketAsync(Server.Profile.FullUsername);
+        // A fresh ticket for the page (logging in again if the old one expired).
+        await Server.WithLoginAsync(() => api.RenewTicketAsync(Server.Profile.FullUsername));
         return (api.WebConsoleUri(Kind), api.AuthCookieValue ?? throw new InvalidOperationException("no ticket"));
     }
 

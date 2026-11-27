@@ -121,6 +121,7 @@ public sealed class ProxmoxClient : IDisposable
         if (IntValue(first["NeedTFA"]) != 1)
         {
             auth = new TicketAuth(ticket, (string?)first["CSRFPreventionToken"] ?? throw new BadResponseException());
+            TicketIssued = DateTime.UtcNow;
             return;
         }
         if (string.IsNullOrWhiteSpace(otp)) throw new NeedsTotpException();
@@ -132,16 +133,29 @@ public sealed class ProxmoxClient : IDisposable
             authenticated: false);
         auth = new TicketAuth((string?)second["ticket"] ?? throw new BadResponseException(),
                               (string?)second["CSRFPreventionToken"] ?? throw new BadResponseException());
+        TicketIssued = DateTime.UtcNow;
     }
 
     /// <summary>Uses an API token ("user@realm!tokenname" + secret) instead of a password.</summary>
     public async Task UseTokenAsync(string id, string secret)
     {
         auth = new TokenAuth(id, secret);
+        TicketIssued = null;
         await RequestAsync<JsonObject>("GET", "/api2/json/version");
     }
 
     public bool UsesTicket => auth is TicketAuth;
+    /// <summary>When the current ticket was issued (null with an API token).</summary>
+    public DateTime? TicketIssued { get; private set; }
+
+    /// <summary>Dev aid (debug action <c>expire</c>): swaps the ticket for one Proxmox refuses,
+    /// issued two hours ago, as after a night in standby.</summary>
+    public void DebugExpireTicket()
+    {
+        if (auth is not TicketAuth t) return;
+        auth = t with { Ticket = "PVE:expired" };
+        TicketIssued = DateTime.UtcNow.AddHours(-2);
+    }
 
     /// <summary>Tickets are valid for two hours; an existing ticket can be traded for a new one.</summary>
     public async Task RenewTicketAsync(string username)

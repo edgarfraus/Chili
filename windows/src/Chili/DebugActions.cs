@@ -168,6 +168,24 @@ public sealed partial class MainWindow
                   $"console={model.Consoles.LastOrDefault()?.State}");
     }
 
+    /// <summary>expire:&lt;server name&gt; — logs in to that saved server, makes its ticket expired,
+    /// presses Refresh: Chili should log in again by itself and stay on the VM list.</summary>
+    private async Task DebugExpireAsync(string name)
+    {
+        var item = Nav.MenuItems.OfType<Microsoft.UI.Xaml.Controls.NavigationViewItem>().FirstOrDefault(i => i.Content as string == name);
+        if (item is null) { Debug.Log($"expire: no server named {name}"); return; }
+        Nav.SelectedItem = item;
+        await Task.Delay(500);
+        if (await ReadySessionAsync() is not { } session) { Debug.Log("expire: not logged in"); return; }
+        Debug.Log($"expire: ready, {session.VMs.Count} machines");
+        session.Api.DebugExpireTicket();
+        session.Refresh();
+        for (int i = 0; i < 40 && session.Api.TicketIssued < DateTime.UtcNow.AddHours(-1); i++) await Task.Delay(250);
+        await Task.Delay(1500);
+        Debug.Log($"expire: state={session.State} error={session.LastError ?? "none"} machines={session.VMs.Count} " +
+                  $"new ticket={session.Api.TicketIssued > DateTime.UtcNow.AddMinutes(-1)}");
+    }
+
     /// <summary>novnc:&lt;vmid&gt; / shell — opens a running VM's noVNC console (or the first node's
     /// shell) in a WebView2 tab and saves a PNG of the page (CHILI_DEBUG_SNAPSHOT dir, webview.png).</summary>
     private async Task DebugWebConsoleAsync(int? vmid)
