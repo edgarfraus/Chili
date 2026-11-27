@@ -37,6 +37,12 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>Open source, GPL-2.0-or-later. Bundles virt-viewer, spice-gtk, GTK and GStreamer.</string>
+	<!-- The web console proxy (WebConsoleProxy.swift) serves Proxmox' noVNC page on http://127.0.0.1. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>The virtual machine is asking to use your microphone (SPICE audio recording).</string>
 	<key>SCProjectURL</key>

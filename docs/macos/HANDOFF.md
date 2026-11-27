@@ -4,6 +4,45 @@ Read `CLAUDE.md` first (working rules, EDG_Lab etiquette, dev aids). This file l
 gained since v1.0.0 that the macOS app still lacks, with the design already used on Windows so both stay
 in step. Answer the maintainer in Italian.
 
+## Next on the Mac (2026-11-27): test the noVNC proxy and the automatic re-login
+
+Written on the Windows machine and only **compiled** by CI; nothing below has run on a Mac yet. What changed
+and why: the *Ported from Windows (2026-11-27)* paragraph below. Files: `launcher/Sources/WebConsoleProxy.swift`
+(new), `Console.swift` (`ConsoleSession` uses the proxy when the profile has an Access token), `Model.swift`
+(`ServerSession.withLogin`, `renewTicketIfOld`, `loginAgain`), `Proxmox.swift` (`ticketIssued`,
+`.sessionExpired`, `debugExpireTicket`), `main.swift` (debug action `expire`), `resources/Info.plist.in`
+(`NSAllowsLocalNetworking`, for the proxy's `http://127.0.0.1` page). Windows equivalents, tested on EDG_Lab and
+on the real Access host: `windows/src/Chili.Core/Proxmox/WebConsoleProxy.cs`, `ServerSession.WithLoginAsync`.
+
+1. **Build:** `git pull`, then `make` (or the launcher dev loop in `CLAUDE.md`). Each rebuilt binary asks the
+   maintainer to approve a Keychain prompt.
+2. **Re-login** (the first saved server must be EDG_Lab with a password login):
+   `CHILI_DEBUG_ACTION=expire` → log `expire: state=ready error=none machines=<n> new ticket=true`, and the
+   VM list stays on screen. On Windows this took about 5 s (Proxmox delays refused logins).
+   `state=loggedOut` + "The session has expired" means `loginAgain` didn't find the password (memory or Keychain).
+3. **Proxy without Cloudflare:** `CHILI_DEBUG_ACTION=spicetunnel:<id>:access CHILI_DEBUG_SNAPSHOT=<dir>` with
+   `<id>` a VM that is **already running** (never start the maintainer's VMs, send no input). The made-up token
+   makes the noVNC console go through the proxy to the LAN Proxmox, whose self-signed certificate must pass the
+   pinned-fingerprint check. Expect `spicetunnel: noVNC console=connected` and, in the snapshot, the VM screen
+   with **no** red "Failed to connect to server" bar. Also try **Disconnect** then reopen (the proxy restarts).
+4. **Real Cloudflare Access**, with the maintainer: their remote profile (`edglabs.edgarfraus.it`, **port 443**:
+   Cloudflare doesn't carry 8006, the Windows profile had 8006 and timed out) with the service token. Open noVNC
+   on a running VM and a node shell; the maintainer checks screen and keyboard. Without the proxy this showed
+   "Failed to connect to server" (WebSocket 403 from Access).
+5. **If something fails:**
+   - Proxmox login form instead of the console → WKWebView didn't take `PVEAuthCookie` for `127.0.0.1`: try
+     `localhost` both in `WebConsoleProxy.local(_:port:)` and as the cookie domain in `ConsoleSession.loadWeb`.
+   - Blank page / "could not connect" → ATS (`NSAllowsLocalNetworking` must be in the built bundle's
+     Info.plist) or the listener; print `webProxy.lastError`.
+   - noVNC "Failed to connect to server" → the WebSocket upgrade: the web view has the Web Inspector
+     (`developerExtrasEnabled`; right-click → Inspect Element → Network → the `vncwebsocket` request: 101
+     expected), or log in `WebConsoleProxy.Exchange` the request line and the response status.
+   - TLS refused towards Proxmox → the verify block (`ConsoleSession.certificateCheck`): Cloudflare's certificate
+     must pass `SecTrustEvaluateWithError`, a LAN one the pinned fingerprint.
+6. **Then:** commit the fixes (`[skip ci]` unless a CI run is wanted), update this section, and release **1.1.4**
+   (bump `VERSION`, release notes: "Mac: noVNC through Cloudflare Access, automatic re-login"; 1.1.3 says the Mac
+   fix comes later).
+
 Done on macOS (2026-11-23): sections 1–3, tested on EDG_Lab (tunnel: 4 WebSockets, console connected; update: dev bundle 0.9.0 → real v1.0.0, swapped, signature valid, relaunched). Section 4: v1.0.1 released (both DMGs + sources, Latest).
 Done on macOS (2026-11-24): Cloudflare Access (service token in the profile + Keychain `<uuid>.access`, API
 headers, no redirects + login-page detection, WKWebView navigations with the headers, tunnel handshake headers
@@ -21,9 +60,7 @@ tested against a real Access application (the maintainer has none set up yet). N
 - *Expired ticket:* `ServerSession.withLogin` renews the ticket after an hour and, on a 401, logs in again with
   the password (2FA or no password → login form, "The session has expired: log in again."). Used by Refresh, the
   timer, SPICE and the web consoles.
-- **To test on the Mac:** `CHILI_DEBUG_ACTION=expire` (log: `state=ready error=none … new ticket=true`), and
-  `spicetunnel:<id>:access` then a noVNC console (made-up token: Proxmox ignores the headers, the page must still
-  connect through the proxy). Best: the maintainer's real Access host (port 443).
+- **Test plan:** section *Next on the Mac* at the top of this file.
 
 State at handoff: macOS `v1.0.0` released (both DMGs, sources). Windows `windows-v1.0.1` released with
 everything below. All work is on `main`.
