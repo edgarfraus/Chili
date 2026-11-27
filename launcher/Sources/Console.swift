@@ -24,10 +24,10 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
     private let webReload: (() async throws -> (URL, HTTPCookie?))?
     /// Web: certificate pinned by the user for this server.
     private let trustedHost: (host: String, port: Int)?
-    /// Web: headers for requests to the Proxmox host (a Cloudflare Access service token). WKWebView can
-    /// only add them to navigations; Access answers with its CF_Authorization cookie, which the page's
-    /// other requests and the console WebSocket then carry.
-    private let webHeaders: [String: String]
+    /// Web: with headers for the Proxmox host (a Cloudflare Access service token) the page goes through
+    /// this proxy, which adds them to every request. WKWebView could only add them to navigations, not
+    /// to the console's WebSocket, and Access sets no cookie for a service token.
+    private let webProxy: WebConsoleProxy?
 
     @Published private(set) var connection: CSConnection?
     @Published private(set) var state: CSConnectionState = .connecting
@@ -48,7 +48,7 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
         reconnectOptions = reconnect
         webReload = nil
         trustedHost = nil
-        webHeaders = [:]
+        webProxy = nil
         super.init()
         view.captureChanged = { [weak self] captured in self?.pointerCaptured = captured }
         attach(Self.makeConnection(config))
@@ -68,7 +68,8 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
         diagnostic = nil
         webReload = load
         trustedHost = (host, port)
-        webHeaders = headers
+        webProxy = headers.isEmpty ? nil
+            : WebConsoleProxy(host: host, port: port, headers: headers, accepts: ConsoleSession.certificateCheck(host: host, port: port))
         super.init()
         web.navigationDelegate = self
         web.uiDelegate = self
@@ -139,6 +140,7 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
         spiceView?.releasePointer()
         connection?.disconnect()
         webView?.loadHTMLString("", baseURL: nil)
+        webProxy?.stop()
     }
 
     func sendCtrlAltDel() {
@@ -155,11 +157,18 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
         errorMessage = nil
         Task {
             do {
-                let (url, cookie) = try await webReload()
+                var (url, cookie) = try await webReload()
+                if let webProxy {
+                    let port = try await webProxy.start()
+                    url = WebConsoleProxy.local(url, port: port)
+                    cookie = cookie.flatMap {
+                        HTTPCookie(properties: [.name: $0.name, .value: $0.value, .domain: "127.0.0.1", .path: "/"])
+                    }
+                }
                 if let cookie {
                     await webView.configuration.websiteDataStore.httpCookieStore.setCookieAsync(cookie)
                 }
-                webView.load(withHeaders(URLRequest(url: url)))
+                webView.load(URLRequest(url: url))
             } catch {
                 state = .disconnected
                 errorMessage = error.localizedDescription
@@ -167,32 +176,18 @@ final class ConsoleSession: NSObject, ObservableObject, Identifiable {
         }
     }
 
-    private func withHeaders(_ request: URLRequest) -> URLRequest {
-        var r = request
-        for (k, v) in webHeaders { r.setValue(v, forHTTPHeaderField: k) }
-        return r
-    }
-
-    private func needsHeaders(_ request: URLRequest) -> Bool {
-        guard let (host, _) = trustedHost, let first = webHeaders.first,
-              request.url?.host?.lowercased() == host.trimmingCharacters(in: CharacterSet(charactersIn: "[]")).lowercased()
-        else { return false }
-        return request.value(forHTTPHeaderField: first.key) == nil
+    /// Proxmox' certificate for the console proxy, as for the API: valid, or the one the user pinned.
+    /// Runs on the proxy's queue.
+    private nonisolated static func certificateCheck(host: String, port: Int) -> (SecTrust) -> Bool {
+        { trust in
+            if SecTrustEvaluateWithError(trust, nil) { return true }
+            guard let fp = ProxmoxClient.fingerprint(of: trust) else { return false }
+            return TrustStore.isTrusted(fp, host: host, port: port)
+        }
     }
 }
 
 extension ConsoleSession: WKNavigationDelegate, WKUIDelegate {
-    /// Page navigations to the Proxmox host (reloads, redirects) without the Access headers are sent again with them.
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        if navigationAction.targetFrame?.isMainFrame == true, needsHeaders(navigationAction.request) {
-            decisionHandler(.cancel)
-            webView.load(withHeaders(navigationAction.request))
-            return
-        }
-        decisionHandler(.allow)
-    }
-
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         state = .connected
     }
@@ -208,7 +203,6 @@ extension ConsoleSession: WKNavigationDelegate, WKUIDelegate {
     private func webFailed(_ error: Error) {
         let e = error as NSError
         if e.code == NSURLErrorCancelled { return }
-        if e.domain == WKErrorDomain || e.domain == "WebKitErrorDomain", e.code == 102 { return }  // our own re-load with headers
         state = .disconnected
         errorMessage = error.localizedDescription
     }

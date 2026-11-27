@@ -26,6 +26,3 @@
 "This copy wasn't installed with the setup: updates are only checked, not installed." = "Questa copia non è stata installata con il programma di installazione: gli aggiornamenti vengono solo controllati, non installati.";
 "not installed" = "non installato";
 "Passwords and tokens are kept in Windows Credential Manager, not in these folders." = "Password e token sono conservati in Gestione credenziali di Windows, non in queste cartelle.";
-
-/* Session */
-"The session has expired: log in again." = "La sessione è scaduta: accedi di nuovo.";

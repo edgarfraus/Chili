@@ -24,6 +24,7 @@
 "Token secret" = "Segreto del token";
 "Password" = "Password";
 "Log In" = "Accedi";
+"The session has expired: log in again." = "La sessione è scaduta: accedi di nuovo.";
 "Filter" = "Filtra";
 "Show stopped VMs" = "Mostra VM spente";
 "No virtual machines on this server." = "Nessuna macchina virtuale su questo server.";

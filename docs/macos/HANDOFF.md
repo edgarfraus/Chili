@@ -11,15 +11,19 @@ when `spiceTunnelUsesAccess`, editor sections). Tested on EDG_Lab with a made-up
 login OK, 4/4 tunnel handshakes with the headers, SPICE and noVNC connected) and offline (`accesscheck`). Not
 tested against a real Access application (the maintainer has none set up yet). Next: release v1.0.2.
 
-**Open (2026-11-26), found on Windows against the maintainer's real Access application:** with a service token
-Access never sets `CF_Authorization` (checked: no `Set-Cookie` on the page or the API), and the web view can't add
-headers to the noVNC / xterm.js **WebSocket**, so it gets a 403 and noVNC says "Failed to connect to server".
-The macOS design above (headers on navigations, then the cookie) has the same hole. Windows fix:
-`windows/src/Chili.Core/Proxmox/WebConsoleProxy.cs` — an HTTPS proxy on 127.0.0.1 with a throwaway self-signed
-certificate (accepted by fingerprint), one request per connection (`Connection: close`, so no body parsing),
-WebSocket upgrades piped through; it rewrites Host/Origin/Referer and adds the headers. Used only when the
-profile has a token. Tests: `WebConsoleProxyTests`. Port it to `Console.swift` (Network.framework listener,
-`NWProtocolTLS` with a generated identity, accept it in `didReceive challenge` by fingerprint).
+**Ported from Windows (2026-11-27), written on the Windows machine: not yet compiled or run on a Mac.**
+- *noVNC through Cloudflare Access:* with a service token Access never sets `CF_Authorization`, and WKWebView
+  can't add headers to the console's WebSocket, so it got a 403 ("Failed to connect to server").
+  `WebConsoleProxy.swift`: plain HTTP on 127.0.0.1 (Proxmox' noVNC and xterm.js then use `ws://`; checked in
+  their sources), TLS to Proxmox with the API's certificate rule, one request per connection, WebSocket upgrades
+  piped, Host/Origin/Referer rewritten, the headers added. Used by `ConsoleSession` only when there are headers
+  (the old re-load-with-headers navigation code is gone). Windows does the same over HTTPS (`WebConsoleProxy.cs`).
+- *Expired ticket:* `ServerSession.withLogin` renews the ticket after an hour and, on a 401, logs in again with
+  the password (2FA or no password → login form, "The session has expired: log in again."). Used by Refresh, the
+  timer, SPICE and the web consoles.
+- **To test on the Mac:** `CHILI_DEBUG_ACTION=expire` (log: `state=ready error=none … new ticket=true`), and
+  `spicetunnel:<id>:access` then a noVNC console (made-up token: Proxmox ignores the headers, the page must still
+  connect through the proxy). Best: the maintainer's real Access host (port 443).
 
 State at handoff: macOS `v1.0.0` released (both DMGs, sources). Windows `windows-v1.0.1` released with
 everything below. All work is on `main`.

@@ -192,6 +192,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 catch { DebugActions.log("tasklog failed: \(error.localizedDescription)") }
             }
         }
+        case "expire": whenReady {   // expired ticket + Refresh: Chili must log in again by itself
+            DebugActions.log("expire: ready, \(session.vms.count) machines")
+            session.api.debugExpireTicket()
+            session.refresh()
+            func stale() -> Bool { session.api.ticketIssued.map { Date().timeIntervalSince($0) > 3600 } ?? true }
+            for _ in 0..<40 where stale() { try? await Task.sleep(nanoseconds: 250_000_000) }
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            DebugActions.log("expire: state=\(session.state) error=\(session.lastError ?? "none") machines=\(session.vms.count) new ticket=\(!stale())")
+        }
         case "novnc": if let vm { session.openWebConsole(.vm(vm)) }
         case "spice": if let vm { session.connect(vm) }
         case "spicetunnel": whenReady { await DebugActions.spiceTunnel(app: self.model, real: session, vmid: parts.count > 1 ? parts[1] : "",

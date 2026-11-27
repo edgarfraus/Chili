@@ -45,6 +45,8 @@ enum ProxmoxError: LocalizedError {
     case cloudflareAccess(host: String, tokenSent: Bool)
     /// Some other login page or proxy answered with HTML or a redirect.
     case webPage(host: String, status: Int)
+    /// The ticket expired and logging in again needs the user (2FA code, or no password at hand).
+    case sessionExpired
 
     var errorDescription: String? {
         switch self {
@@ -66,6 +68,8 @@ enum ProxmoxError: LocalizedError {
             return String(format: NSLocalizedString("%@ is protected by Cloudflare Access, which Chili can't log in to with a browser page. Create a service token in Cloudflare Zero Trust, allow it with a Service Auth policy, and enter it in the server settings, under Cloudflare Access.", comment: ""), host)
         case .webPage(let host, let status):
             return String(format: NSLocalizedString("%@ answered with a web page instead of the Proxmox API (HTTP %d). Is there a login page or a proxy in front of it?", comment: ""), host, status)
+        case .sessionExpired:
+            return NSLocalizedString("The session has expired: log in again.", comment: "")
         case .noSpice:
             return NSLocalizedString("This VM has no SPICE display. In Proxmox, set Hardware → Display to “SPICE (qxl)” and restart the VM.", comment: "")
         }
@@ -82,6 +86,8 @@ final class ProxmoxClient: NSObject, URLSessionTaskDelegate {
     let host: String
     let port: Int
     private(set) var auth: Auth?
+    /// When the current ticket was issued (nil with an API token).
+    private(set) var ticketIssued: Date?
     /// Extra headers sent with every request, e.g. a Cloudflare Access service token
     /// (CF-Access-Client-Id / CF-Access-Client-Secret).
     var extraHeaders: [String: String] = [:]
@@ -156,6 +162,7 @@ final class ProxmoxClient: NSObject, URLSessionTaskDelegate {
         guard first.NeedTFA == 1 else {
             guard let csrf = first.CSRFPreventionToken else { throw ProxmoxError.badResponse }
             auth = .ticket(ticket: first.ticket, csrf: csrf)
+            ticketIssued = Date()
             return
         }
         guard let otp, !otp.isEmpty else { throw ProxmoxError.needsTOTP }
@@ -168,11 +175,13 @@ final class ProxmoxClient: NSObject, URLSessionTaskDelegate {
                                                authenticated: false)
         guard let csrf = second.CSRFPreventionToken else { throw ProxmoxError.badResponse }
         auth = .ticket(ticket: second.ticket, csrf: csrf)
+        ticketIssued = Date()
     }
 
     /// Uses an API token ("user@realm!tokenname" + secret) instead of a password.
     func useToken(id: String, secret: String) async throws {
         auth = .token(id: id, secret: secret)
+        ticketIssued = nil
         struct Version: Decodable { let version: String }
         let _: Version = try await request("GET", "/api2/json/version")
     }
@@ -436,6 +445,14 @@ final class ProxmoxClient: NSObject, URLSessionTaskDelegate {
     func renewTicket(username: String) async throws {
         guard case .ticket(let ticket, _) = auth else { return }
         try await login(username: username, password: ticket)
+    }
+
+    /// Dev aid (debug action `expire`): swaps the ticket for one Proxmox refuses, issued two hours
+    /// ago, as after a night in standby.
+    func debugExpireTicket() {
+        guard case .ticket(_, let csrf) = auth else { return }
+        auth = .ticket(ticket: "PVE:expired", csrf: csrf)
+        ticketIssued = Date().addingTimeInterval(-7200)
     }
 
     /// Asks Proxmox for a one-time SPICE ticket. The connection goes through the

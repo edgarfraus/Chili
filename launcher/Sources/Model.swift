@@ -300,7 +300,7 @@ final class ServerSession: ObservableObject {
 
     /// A SPICE ticket for the VM, routed through the WebSocket tunnel when configured.
     func spiceConfig(for vm: ProxmoxVM) async throws -> ViewerConfig {
-        var config = try await client.spiceConfig(for: vm)
+        var config = try await withLogin { try await client.spiceConfig(for: vm) }
         if let tunnel {
             let port = try await tunnel.start()
             config["proxy"] = "http://127.0.0.1:\(port)"
@@ -350,17 +350,79 @@ final class ServerSession: ObservableObject {
         }
     }
 
+    /// The Refresh button: reloads, logging in again first if the session has expired.
     func refresh() {
         Task {
-            do { try await reload() } catch { lastError = error.localizedDescription }
+            do {
+                try await withLogin { try await self.reload() }
+                lastError = nil
+            } catch ProxmoxError.sessionExpired {
+            } catch {
+                lastError = error.localizedDescription
+            }
         }
     }
 
     private func startAutoRefresh() {
         refreshTimer?.invalidate()
         refreshTimer = Timer.scheduledTimer(withTimeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in try? await self?.reload() }
+            Task { @MainActor in
+                guard let self, self.state == .ready else { return }
+                try? await self.withLogin { try await self.reload() }
+            }
         }
+    }
+
+    // MARK: Ticket renewal and logging in again
+
+    /// Proxmox tickets last two hours: renew after one (a ticket buys a new one, no password or
+    /// 2FA code needed). No-op with an API token.
+    private static let ticketRenewal: TimeInterval = 3600
+    private var relogin: Task<Void, Error>?
+
+    func renewTicketIfOld() async throws {
+        if let issued = client.ticketIssued, Date().timeIntervalSince(issued) > Self.ticketRenewal {
+            try await client.renewTicket(username: profile.fullUsername)
+        }
+    }
+
+    /// Runs `action`; if Proxmox refuses the ticket (expired: the Mac slept, or Chili stayed open
+    /// without network), logs in again with the password and retries once. With 2FA, or without a
+    /// password at hand, shows the login form and throws `ProxmoxError.sessionExpired`.
+    /// Same design as the Windows app (`ServerSession.WithLoginAsync`).
+    func withLogin<T>(_ action: () async throws -> T) async throws -> T {
+        do {
+            try await renewTicketIfOld()
+            return try await action()
+        } catch ProxmoxError.http(401, _) where client.usesTicket && profile.authMethod == .password {
+            // The timer and the button may both get here: log in once.
+            let pending = relogin ?? Task { try await self.loginAgain() }
+            relogin = pending
+            defer { relogin = nil }
+            try await pending.value
+            return try await action()
+        }
+    }
+
+    private func loginAgain() async throws {
+        let secret = password.isEmpty ? (storedSecret ?? "") : password
+        guard !secret.isEmpty else { throw expired(.loggedOut) }
+        do {
+            try await client.login(username: profile.fullUsername, password: secret)
+            if password.isEmpty { password = secret }
+        } catch ProxmoxError.needsTOTP {
+            password = secret   // the login form then asks only for the code
+            throw expired(.needsOTP)
+        } catch ProxmoxError.http(401, _) {
+            throw expired(.loggedOut)   // the password changed meanwhile
+        }
+    }
+
+    private func expired(_ newState: State) -> ProxmoxError {
+        refreshTimer?.invalidate()
+        state = newState
+        lastError = NSLocalizedString("The session has expired: log in again.", comment: "")
+        return .sessionExpired
     }
 
     /// Opens the VM's console, starting the VM first if needed.
@@ -410,7 +472,8 @@ final class ServerSession: ObservableObject {
         let username = profile.fullUsername
         app?.openWebConsole(title: title, host: client.host, port: client.port, headers: client.extraHeaders,
                             placement: placement) {
-            try? await client.renewTicket(username: username)
+            // A fresh ticket for the page (logging in again if the old one expired).
+            try await self.withLogin { try await client.renewTicket(username: username) }
             return (try client.webConsoleURL(kind), client.authCookie())
         }
     }
